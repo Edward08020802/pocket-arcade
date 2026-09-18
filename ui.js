@@ -1,21 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Dimensions, PanResponder, Pressable, StyleSheet, Text, View,
+  Animated, Dimensions, Easing, PanResponder, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { T } from './theme';
+import { fx, useMuted } from './sound';
 
 export const WIN = Dimensions.get('window');
 
 /** Screen chrome shared by every game: title, back, score line, restart. */
 export function GameFrame({ title, onExit, onRestart, stats = [], children, footer }) {
   const insets = useSafeAreaInsets();
+  const [muted, toggleMute] = useMuted();
   return (
     <View style={[s.root, { paddingTop: insets.top + 6 }]}>
       <View style={s.header}>
         <Pressable
-          onPress={onExit}
+          onPress={() => { fx('tap'); onExit(); }}
           hitSlop={12}
           style={({ pressed }) => [s.iconBtn, pressed && s.pressed]}
         >
@@ -23,7 +25,18 @@ export function GameFrame({ title, onExit, onRestart, stats = [], children, foot
         </Pressable>
         <Text style={s.title} numberOfLines={1}>{title}</Text>
         <Pressable
-          onPress={onRestart}
+          onPress={toggleMute}
+          hitSlop={10}
+          style={({ pressed }) => [s.iconBtn, pressed && s.pressed]}
+        >
+          <Ionicons
+            name={muted ? 'volume-mute' : 'volume-medium'}
+            size={19}
+            color={muted ? T.dim : T.cyan}
+          />
+        </Pressable>
+        <Pressable
+          onPress={() => { fx('tap'); onRestart(); }}
           hitSlop={12}
           style={({ pressed }) => [s.iconBtn, pressed && s.pressed]}
         >
@@ -54,10 +67,10 @@ export function GameFrame({ title, onExit, onRestart, stats = [], children, foot
 }
 
 /** Full-width action button. */
-export function Btn({ label, icon, color = T.cyan, onPress, disabled, flex }) {
+export function Btn({ label, icon, color = T.cyan, onPress, disabled, flex, sfx = 'tap' }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { if (sfx) fx(sfx); onPress?.(); }}
       disabled={disabled}
       style={({ pressed }) => [
         s.btn,
@@ -75,15 +88,79 @@ export function Btn({ label, icon, color = T.cyan, onPress, disabled, flex }) {
 
 /** Centred overlay for win/lose, drawn above the board rather than as an alert. */
 export function Banner({ title, detail, tint = T.green, children }) {
+  const grow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(grow, { toValue: 1, useNativeDriver: true, friction: 6, tension: 90 }).start();
+  }, [grow]);
   return (
     <View style={s.bannerWrap} pointerEvents="box-none">
-      <View style={[s.banner, { borderColor: tint + '66' }]}>
+      <Animated.View
+        style={[
+          s.banner,
+          { borderColor: tint + '66' },
+          {
+            opacity: grow,
+            transform: [{ scale: grow.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
+          },
+        ]}
+      >
         <Text style={[s.bannerTitle, { color: tint }]}>{title}</Text>
         {!!detail && <Text style={s.bannerDetail}>{detail}</Text>}
         {children}
-      </View>
+      </Animated.View>
     </View>
   );
+}
+
+/**
+ * Scale-pops whenever `trigger` changes. Used for tiles appearing, discs
+ * landing, pads lighting -- the small bits of feedback that make a board feel
+ * like it responded rather than just redrew.
+ */
+export function Pop({ trigger, from = 0.6, style, children, spring = true }) {
+  const v = useRef(new Animated.Value(1)).current;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    v.setValue(from);
+    if (spring) {
+      Animated.spring(v, { toValue: 1, useNativeDriver: true, friction: 5, tension: 160 }).start();
+    } else {
+      Animated.timing(v, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    }
+  }, [trigger, v, from, spring]);
+  return <Animated.View style={[style, { transform: [{ scale: v }] }]}>{children}</Animated.View>;
+}
+
+/** Fades and slides in once, for boards and cards appearing. */
+export function FadeIn({ delay = 0, style, children }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(v, {
+      toValue: 1, duration: 260, delay, easing: Easing.out(Easing.quad), useNativeDriver: true,
+    }).start();
+  }, [v, delay]);
+  return (
+    <Animated.View
+      style={[
+        style,
+        { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/** A value that animates towards `to` -- used for falling pieces. */
+export function useSlide(to, duration = 180) {
+  const v = useRef(new Animated.Value(to)).current;
+  useEffect(() => {
+    Animated.timing(v, {
+      toValue: to, duration, easing: Easing.bounce, useNativeDriver: true,
+    }).start();
+  }, [to, v, duration]);
+  return v;
 }
 
 /**

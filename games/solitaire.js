@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const SUITS = [
   { key: 's', sym: '♠', red: false },
@@ -82,6 +83,7 @@ export default function Solitaire({ onExit }) {
 
   useEffect(() => {
     if (!won) return;
+    fx('win', 'success');
     submitScore('solitaire', moves, false).then((b) => { if (b) setBest(moves); });
   }, [won, moves]);
 
@@ -94,6 +96,7 @@ export default function Solitaire({ onExit }) {
         return { ...g, stock, waste: [...g.waste, card] };
       }
       if (!g.waste.length) return g;
+      // recycling the waste back under the stock
       // Recycle: the waste goes back under the stock in the same order.
       return { ...g, stock: g.waste.slice().reverse().map((c) => ({ ...c, up: false })), waste: [] };
     });
@@ -129,7 +132,7 @@ export default function Solitaire({ onExit }) {
       done = true;
       return { ...rest, foundations: { ...rest.foundations, [card.suit]: [...pile, card] } };
     });
-    if (done) setMoves((n) => n + 1);
+    if (done) { fx('merge'); setMoves((n) => n + 1); }
     return done;
   }, []);
 
@@ -145,7 +148,7 @@ export default function Solitaire({ onExit }) {
       ok = true;
       return { ...rest, tableau };
     });
-    if (ok) { setMoves((n) => n + 1); setSel(null); }
+    if (ok) { play('place'); setMoves((n) => n + 1); setSel(null); }
     return ok;
   }, [sel]);
 
@@ -187,7 +190,7 @@ export default function Solitaire({ onExit }) {
         foundations: { ...rest.foundations, [suit]: [...rest.foundations[suit], card] },
       };
     });
-    if (ok) { setMoves((n) => n + 1); setSel(null); }
+    if (ok) { fx('merge'); setMoves((n) => n + 1); setSel(null); }
   }, [sel]);
 
   const isSel = (from, col, index) =>

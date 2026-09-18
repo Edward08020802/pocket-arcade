@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const COLS = 10;
 const ROWS = 18;
@@ -94,12 +95,16 @@ export default function Tetris({ onExit }) {
     const merged = merge(b, p, x, y);
     const { board: cleaned, cleared } = clearLines(merged);
     if (cleared) {
+      fx(cleared === 4 ? 'win' : 'clear', cleared === 4 ? 'success' : 'medium');
       setLines((n) => n + cleared);
       setScore((n) => n + LINE_SCORE[cleared]);
+    } else {
+      play('place');
     }
     const upcoming = st.current.next;
     const nx = spawnX(upcoming.cells);
     if (collides(cleaned, upcoming.cells, nx, -1)) {
+      fx('lose', 'error');
       setBoard(cleaned);
       setOver(true);
       return;
@@ -123,7 +128,10 @@ export default function Tetris({ onExit }) {
   const shift = useCallback((dx) => {
     const { board: b, piece: p, pos: c, over: o, paused: pa } = st.current;
     if (o || pa) return;
-    if (!collides(b, p.cells, c.x + dx, c.y)) setPos({ x: c.x + dx, y: c.y });
+    if (!collides(b, p.cells, c.x + dx, c.y)) {
+      play('move');
+      setPos({ x: c.x + dx, y: c.y });
+    }
   }, []);
 
   const spin = useCallback(() => {
@@ -133,6 +141,7 @@ export default function Tetris({ onExit }) {
     // Wall kicks: try in place, then nudged one or two cells off the wall.
     for (const dx of [0, -1, 1, -2, 2]) {
       if (!collides(b, turned, c.x + dx, c.y)) {
+        play('select');
         setPiece({ ...p, cells: turned });
         setPos({ x: c.x + dx, y: c.y });
         return;
@@ -145,6 +154,7 @@ export default function Tetris({ onExit }) {
     if (o || pa) return;
     let y = c.y;
     while (!collides(b, p.cells, c.x, y + 1)) y++;
+    fx('drop', 'medium');
     setScore((n) => n + (y - c.y) * 2);
     lock(b, p, c.x, y);
   }, [lock]);

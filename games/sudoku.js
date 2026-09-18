@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const SIZE = Math.min(WIN.width - 24, 400);
 const CELL = Math.floor(SIZE / 9);
@@ -112,6 +113,7 @@ export default function Sudoku({ onExit }) {
 
   useEffect(() => {
     if (!done) return;
+    fx('win', 'success');
     submitScore(`sudoku-${level}`, seconds, false).then((b) => { if (b) setBest(seconds); });
   }, [done, seconds, level]);
 
@@ -120,7 +122,12 @@ export default function Sudoku({ onExit }) {
     setCells((prev) => {
       if (prev[pick].fixed) return prev;
       const next = prev.slice();
-      next[pick] = { ...next[pick], value: next[pick].value === n ? 0 : n };
+      const value = next[pick].value === n ? 0 : n;
+      // A wrong digit is allowed -- it just sounds wrong and shows red.
+      if (value === 0) play('move');
+      else if (value === solution[pick]) play('place');
+      else fx('error', 'warning');
+      next[pick] = { ...next[pick], value };
       return next;
     });
   }, [pick]);
@@ -177,7 +184,7 @@ export default function Sudoku({ onExit }) {
               return (
                 <Pressable
                   key={c}
-                  onPress={() => setPick(i)}
+                  onPress={() => { play('select'); setPick(i); }}
                   style={[
                     s.cell,
                     { width: CELL, height: CELL },

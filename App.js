@@ -7,6 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { T } from './theme';
 import { loadBests } from './storage';
+import { fx, useMuted } from './sound';
 
 import Snake from './games/snake';
 import Solitaire from './games/solitaire';
@@ -17,6 +18,13 @@ import Sudoku from './games/sudoku';
 import Memory from './games/memory';
 import Simon from './games/simon';
 import ConnectFour from './games/connect4';
+import Breakout from './games/breakout';
+import Pong from './games/pong';
+import Fifteen from './games/fifteen';
+import LightsOut from './games/lightsout';
+import Mastermind from './games/mastermind';
+import Blackjack from './games/blackjack';
+import Chess from './games/chess';
 
 /**
  * Every game is self-contained and offline: no network calls anywhere in this
@@ -50,14 +58,36 @@ const GAMES = [
   { key: 'simon', title: 'Simon', blurb: 'Repeat the sequence, one longer each time',
     icon: 'musical-note', tint: T.lime, Component: Simon,
     score: (v) => `round ${v}` },
-  { key: 'connect4', title: 'Connect Four', blurb: 'Four in a row against the phone',
+  { key: 'connect4-Normal', title: 'Connect Four', blurb: 'Four in a row against the phone',
     icon: 'ellipse', tint: '#F97316', Component: ConnectFour,
     score: (v) => `${v} in a row` },
+  { key: 'breakout', title: 'Breakout', blurb: 'Knock out every brick',
+    icon: 'tablet-landscape', tint: '#22D3EE', Component: Breakout,
+    score: (v) => `${v} pts` },
+  { key: 'pong', title: 'Pong', blurb: 'First to seven against the phone',
+    icon: 'ellipse-outline', tint: '#94A3B8', Component: Pong,
+    score: (v) => `+${v}` },
+  { key: 'fifteen', title: '15 Puzzle', blurb: 'Slide the tiles back into order',
+    icon: 'swap-horizontal', tint: '#34D399', Component: Fifteen,
+    score: (v) => `${v} moves` },
+  { key: 'lightsout', title: 'Lights Out', blurb: 'Turn every light off',
+    icon: 'bulb', tint: '#FCD34D', Component: LightsOut,
+    score: (v) => `${v} moves` },
+  { key: 'mastermind', title: 'Mastermind', blurb: 'Crack the hidden colour code',
+    icon: 'color-palette', tint: '#C084FC', Component: Mastermind,
+    score: (v) => `${v} tries` },
+  { key: 'blackjack', title: 'Blackjack', blurb: 'Beat the dealer without busting',
+    icon: 'diamond', tint: '#FB7185', Component: Blackjack,
+    score: (v) => `${v} chips` },
+  { key: 'chess', title: 'Chess', blurb: 'Five strength settings, ~400 to ~1800',
+    icon: 'school', tint: '#E2E8F0', Component: Chess,
+    score: (v) => `beat level ${v}` },
 ];
 
 function Hub({ onPick }) {
   const insets = useSafeAreaInsets();
   const [bests, setBests] = useState({});
+  const [muted, toggleMute] = useMuted();
 
   // Re-read on every return to the hub so a new best shows up immediately.
   useEffect(() => { loadBests().then((b) => setBests({ ...b })); }, []);
@@ -65,8 +95,21 @@ function Hub({ onPick }) {
   return (
     <View style={[s.root, { paddingTop: insets.top + 10 }]}>
       <View style={s.head}>
-        <Text style={s.title}>Pocket Arcade</Text>
-        <Text style={s.subtitle}>{GAMES.length} games · works with no signal</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={s.title}>Pocket Arcade</Text>
+          <Text style={s.subtitle}>{GAMES.length} games · works with no signal</Text>
+        </View>
+        <Pressable
+          onPress={toggleMute}
+          hitSlop={12}
+          style={({ pressed }) => [s.muteBtn, pressed && s.pressed]}
+        >
+          <Ionicons
+            name={muted ? 'volume-mute' : 'volume-medium'}
+            size={20}
+            color={muted ? T.dim : T.cyan}
+          />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -78,7 +121,7 @@ function Hub({ onPick }) {
           return (
             <Pressable
               key={g.key}
-              onPress={() => onPick(g)}
+              onPress={() => { fx('select'); onPick(g); }}
               style={({ pressed }) => [s.card, pressed && s.pressed]}
             >
               <View style={[s.iconWrap, { backgroundColor: g.tint + '1E' }]}>
@@ -124,7 +167,11 @@ export default function App() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
-  head: { paddingHorizontal: 18, paddingBottom: 6 },
+  head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 6 },
+  muteBtn: {
+    width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: T.card, borderWidth: 1, borderColor: T.border,
+  },
   title: { color: T.text, fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
   subtitle: { color: T.dim, fontSize: 13, marginTop: 3 },
   card: {

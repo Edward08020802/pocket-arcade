@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+dist/
+/ios
+/android
+npm-debug.*
+*.orig.*
+.DS_Store

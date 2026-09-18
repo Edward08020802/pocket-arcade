@@ -1,7 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
-import * as Haptics from 'expo-haptics';
-import { createAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/**
+ * expo-audio and expo-haptics are loaded lazily, on first use.
+ *
+ * Importing a native module at module scope means any problem registering it
+ * throws while the bundle is still evaluating, which takes the whole app down
+ * to a blank screen before anything renders. Sound is optional; it must never
+ * be able to do that. Loaded this way a missing module costs silence, nothing
+ * more.
+ */
+let audioMod;
+function audio() {
+  if (audioMod === undefined) {
+    try {
+      audioMod = require('expo-audio');
+    } catch {
+      audioMod = null;
+    }
+  }
+  return audioMod;
+}
+
+let hapticsMod;
+function haptics() {
+  if (hapticsMod === undefined) {
+    try {
+      hapticsMod = require('expo-haptics');
+    } catch {
+      hapticsMod = null;
+    }
+  }
+  return hapticsMod;
+}
 
 /**
  * Sound effects and haptics.
@@ -14,6 +45,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * fire far faster than a sound finishes -- a merge chain in 2048 can retrigger
  * within a few frames.
  */
+// Metro resolves these at bundle time, so the calls themselves are safe; the
+// map is still built defensively because it runs during module evaluation.
 const FILES = {
   tap: require('./assets/sfx/tap.wav'),
   move: require('./assets/sfx/move.wav'),
@@ -42,9 +75,10 @@ AsyncStorage.getItem(MUTE_KEY)
   .catch(() => {});
 
 function player(name) {
-  if (!players[name]) {
+  if (!(name in players)) {
     try {
-      players[name] = createAudioPlayer(FILES[name]);
+      const mod = audio();
+      players[name] = mod ? mod.createAudioPlayer(FILES[name]) : null;
     } catch {
       players[name] = null;      // remembered, so it is not retried every tap
     }
@@ -69,12 +103,14 @@ export function play(name) {
 /** Short tactile tick. Separate from sound so it still works when muted. */
 export function buzz(kind = 'light') {
   try {
-    if (kind === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    else if (kind === 'warning') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    else if (kind === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    else if (kind === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    else if (kind === 'heavy') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const H = haptics();
+    if (!H) return;
+    if (kind === 'success') H.notificationAsync(H.NotificationFeedbackType.Success);
+    else if (kind === 'warning') H.notificationAsync(H.NotificationFeedbackType.Warning);
+    else if (kind === 'error') H.notificationAsync(H.NotificationFeedbackType.Error);
+    else if (kind === 'medium') H.impactAsync(H.ImpactFeedbackStyle.Medium);
+    else if (kind === 'heavy') H.impactAsync(H.ImpactFeedbackStyle.Heavy);
+    else H.impactAsync(H.ImpactFeedbackStyle.Light);
   } catch {
     // Not every device has a haptic engine.
   }

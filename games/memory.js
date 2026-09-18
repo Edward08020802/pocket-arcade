@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { T, SPECTRUM } from '../theme';
+import { SPECTRUM, useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -31,6 +31,7 @@ function newDeck() {
 }
 
 export default function Memory({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [deck, setDeck] = useState(newDeck);
   const [up, setUp] = useState([]);           // indices currently face up
   const [done, setDone] = useState(() => new Set());
@@ -122,6 +123,7 @@ export default function Memory({ onExit }) {
  * needing a 3D transform.
  */
 function Tile({ card, shown, matched, onPress }) {
+  const { T, s } = useTheme(makeStyles);
   const spin = useRef(new Animated.Value(shown ? 1 : 0)).current;
   const [face, setFace] = useState(shown);
 
@@ -158,7 +160,7 @@ function Tile({ card, shown, matched, onPress }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, justifyContent: 'center' },
   card: { borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   faceDown: { backgroundColor: T.card, borderColor: T.border },

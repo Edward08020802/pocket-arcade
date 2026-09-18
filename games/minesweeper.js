@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -11,8 +11,10 @@ const ROWS = 12;
 const MINES = 16;
 const CELL = Math.floor(Math.min(WIN.width - 28, 400) / COLS);
 
+// Fixed hues: these must stay distinguishable in either theme.
 const NUM_COLOR = [
-  null, T.cyan, T.green, T.amber, T.violet, T.pink, T.red, T.lime, T.dim,
+  null, '#0284C7', '#0E9F66', '#C2820B', '#7C4DEF', '#DB2E86',
+  '#D6335C', '#5F9B12', '#64748B',
 ];
 
 const key = (x, y) => `${x},${y}`;
@@ -58,6 +60,7 @@ function layMines(safeX, safeY) {
 }
 
 export default function Minesweeper({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [field, setField] = useState(null);       // null until the first tap
   const [revealed, setRevealed] = useState(() => new Set());
   const [flags, setFlags] = useState(() => new Set());
@@ -199,14 +202,14 @@ export default function Minesweeper({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: {
     backgroundColor: T.card, borderRadius: 10, overflow: 'hidden',
     borderWidth: 1, borderColor: T.border,
   },
-  cell: { alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#0B0D1255' },
+  cell: { alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: T.border },
   closed: { backgroundColor: T.cardHi },
-  open: { backgroundColor: '#0F1420' },
+  open: { backgroundColor: T.well },
   num: { fontWeight: '900' },
   hint: { color: T.dim, fontSize: 12, textAlign: 'center' },
 });

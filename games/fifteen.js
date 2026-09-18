@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, Pop, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -52,6 +52,7 @@ function shuffle(steps = 200) {
 const isSolved = (t) => t.every((v, i) => v === SOLVED[i]);
 
 export default function Fifteen({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [tiles, setTiles] = useState(shuffle);
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -134,7 +135,7 @@ export default function Fifteen({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: { backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border },
   tile: { position: 'absolute', borderRadius: 10, backgroundColor: T.cardHi,
           borderWidth: 1, borderColor: T.border },

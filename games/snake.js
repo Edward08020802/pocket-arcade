@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useSwipe, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -36,6 +36,7 @@ function randomFood(snake) {
 }
 
 export default function Snake({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [snake, setSnake] = useState(startSnake);
   const [food, setFood] = useState({ x: 7, y: 5 });
   const [score, setScore] = useState(0);
@@ -188,6 +189,7 @@ export default function Snake({ onExit }) {
 
 /** The apple breathes, so it is easy to spot on a busy board. */
 function Food() {
+  const { T, s } = useTheme(makeStyles);
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -207,13 +209,13 @@ function Food() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   boardWrap: { alignItems: 'center' },
   board: {
     backgroundColor: T.card, borderRadius: 10, overflow: 'hidden',
     borderWidth: 1, borderColor: T.border,
   },
-  cell: { borderWidth: 0.5, borderColor: '#00000018' },
+  cell: { borderWidth: 0.5, borderColor: T.border + '55' },
   snake: { backgroundColor: T.green, borderRadius: 3 },
   head: { backgroundColor: T.lime },
   foodCell: { alignItems: 'center', justifyContent: 'center' },

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, FadeIn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -43,6 +43,7 @@ function handValue(cards) {
 const isBlackjack = (cards) => cards.length === 2 && handValue(cards) === 21;
 
 export default function Blackjack({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [shoe, setShoe] = useState(freshShoe);
   const [player, setPlayer] = useState([]);
   const [dealer, setDealer] = useState([]);
@@ -207,6 +208,7 @@ export default function Blackjack({ onExit }) {
 }
 
 function Hand({ title, cards, hideLast }) {
+  const { T, s } = useTheme(makeStyles);
   return (
     <View style={{ alignItems: 'center' }}>
       <Text style={s.handTitle}>{title}</Text>
@@ -217,8 +219,8 @@ function Hand({ title, cards, hideLast }) {
               <View style={s.back} />
             ) : (
               <View style={s.card}>
-                <Text style={[s.rank, { color: c.red ? '#FF6B8A' : '#DDE5F2' }]}>{c.rank}</Text>
-                <Text style={[s.suit, { color: c.red ? '#FF6B8A' : '#DDE5F2' }]}>
+                <Text style={[s.rank, { color: c.red ? T.cardRed : T.cardBlack }]}>{c.rank}</Text>
+                <Text style={[s.suit, { color: c.red ? T.cardRed : T.cardBlack }]}>
                   {SUITS.find((x) => x.key === c.suit).sym}
                 </Text>
               </View>
@@ -230,15 +232,15 @@ function Hand({ title, cards, hideLast }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   handTitle: { color: T.dim, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, marginBottom: 8 },
   card: {
-    width: CARD_W, height: CARD_H, borderRadius: 7, backgroundColor: '#1A2231',
-    borderWidth: 1, borderColor: '#2A3446', alignItems: 'center', paddingTop: 3,
+    width: CARD_W, height: CARD_H, borderRadius: 7, backgroundColor: T.cardFace,
+    borderWidth: 1, borderColor: T.cardEdge, alignItems: 'center', paddingTop: 3,
   },
   back: {
-    width: CARD_W, height: CARD_H, borderRadius: 7, backgroundColor: '#20304A',
-    borderWidth: 1, borderColor: '#33456B',
+    width: CARD_W, height: CARD_H, borderRadius: 7, backgroundColor: T.cardBack,
+    borderWidth: 1, borderColor: T.cardBackEdge,
   },
   rank: { fontSize: CARD_W * 0.34, fontWeight: '900' },
   suit: { fontSize: CARD_W * 0.32 },

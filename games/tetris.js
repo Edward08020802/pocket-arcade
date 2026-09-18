@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -12,13 +12,13 @@ const CELL = Math.floor(Math.min(WIN.width - 120, 260) / COLS);
 
 // Each shape as a square matrix so rotation is a plain transpose+reverse.
 const SHAPES = {
-  I: { color: T.cyan,   cells: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]] },
-  O: { color: T.amber,  cells: [[1,1],[1,1]] },
-  T: { color: T.violet, cells: [[0,1,0],[1,1,1],[0,0,0]] },
-  S: { color: T.green,  cells: [[0,1,1],[1,1,0],[0,0,0]] },
-  Z: { color: T.red,    cells: [[1,1,0],[0,1,1],[0,0,0]] },
-  J: { color: '#60A5FA',cells: [[1,0,0],[1,1,1],[0,0,0]] },
-  L: { color: T.pink,   cells: [[0,0,1],[1,1,1],[0,0,0]] },
+  I: { color: '#38BDF8', cells: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]] },
+  O: { color: '#FBBF24', cells: [[1,1],[1,1]] },
+  T: { color: '#A78BFA', cells: [[0,1,0],[1,1,1],[0,0,0]] },
+  S: { color: '#22D38A', cells: [[0,1,1],[1,1,0],[0,0,0]] },
+  Z: { color: '#F4547A', cells: [[1,1,0],[0,1,1],[0,0,0]] },
+  J: { color: '#60A5FA', cells: [[1,0,0],[1,1,1],[0,0,0]] },
+  L: { color: '#F472B6', cells: [[0,0,1],[1,1,1],[0,0,0]] },
 };
 const KEYS = Object.keys(SHAPES);
 
@@ -63,6 +63,7 @@ const LINE_SCORE = [0, 100, 300, 500, 800];
 const spawnX = (cells) => Math.floor((COLS - cells[0].length) / 2);
 
 export default function Tetris({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [board, setBoard] = useState(emptyBoard);
   const [piece, setPiece] = useState(randomPiece);
   const [next, setNext] = useState(randomPiece);
@@ -263,23 +264,25 @@ export default function Tetris({ onExit }) {
   );
 }
 
-function Pad({ icon, onPress, color = T.cyan }) {
+function Pad({ icon, onPress, color }) {
+  const { T, s } = useTheme(makeStyles);
+  const tint = color || T.cyan;
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [s.pad, { borderColor: color + '55' }, pressed && { opacity: 0.55 }]}
+      style={({ pressed }) => [s.pad, { borderColor: tint + '55' }, pressed && { opacity: 0.55 }]}
     >
-      <Ionicons name={icon} size={22} color={color} />
+      <Ionicons name={icon} size={22} color={tint} />
     </Pressable>
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: {
-    backgroundColor: '#0F1420', borderRadius: 8, overflow: 'hidden',
+    backgroundColor: T.well, borderRadius: 8, overflow: 'hidden',
     borderWidth: 1, borderColor: T.border,
   },
-  cell: { borderWidth: 0.5, borderColor: '#FFFFFF08' },
+  cell: { borderWidth: 0.5, borderColor: T.border + '55' },
   sideLabel: { color: T.dim, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   preview: {
     backgroundColor: T.card, borderRadius: 10, padding: 8,

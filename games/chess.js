@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View,
+} from 'react-native';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -12,8 +14,13 @@ import {
 const BOARD = Math.min(WIN.width - 20, 400);
 const CELL = BOARD / 8;
 
+// The solid glyph set for both sides, coloured by side.
+//
+// Unicode's "white" pieces (U+2654..) are outlines, which vanish against a
+// light square -- so White gets the same solid shape in white ink with a dark
+// halo, the way a real set reads.
 const GLYPH = {
-  K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
+  K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟',
   k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
 };
 
@@ -31,12 +38,17 @@ const GLYPH = {
  * best move some of the time instead.
  */
 const LEVELS = [
-  { name: 'Beginner', elo: '~400',  depth: 1, blunder: 0.60, budget: 400 },
-  { name: 'Casual',   elo: '~700',  depth: 2, blunder: 0.35, budget: 700 },
-  { name: 'Club',     elo: '~1000', depth: 2, blunder: 0.12, budget: 1200 },
-  { name: 'Strong',   elo: '~1300', depth: 3, blunder: 0.04, budget: 2200 },
-  { name: 'Expert',   elo: '~1600', depth: 5, blunder: 0,    budget: 3500 },
+  { name: 'Beginner', elo: '~400',  depth: 1, blunder: 0.60, budget: 400,  think: [600, 1400] },
+  { name: 'Casual',   elo: '~700',  depth: 2, blunder: 0.35, budget: 700,  think: [700, 1800] },
+  { name: 'Club',     elo: '~1000', depth: 2, blunder: 0.12, budget: 1200, think: [900, 2400] },
+  { name: 'Strong',   elo: '~1300', depth: 3, blunder: 0.04, budget: 2200, think: [1200, 3000] },
+  { name: 'Expert',   elo: '~1600', depth: 5, blunder: 0,    budget: 3500, think: [1500, 3800] },
 ];
+
+const ANIM_MS = 190;
+
+/** Where a square's top-left corner sits, in board pixels. */
+const squareXY = (i) => ({ x: (i % 8) * CELL, y: Math.floor(i / 8) * CELL });
 
 const MATERIAL = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
@@ -50,6 +62,7 @@ function materialEdge(board) {
 }
 
 export default function Chess({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [levelIndex, setLevelIndex] = useState(2);
   const [pos, setPos] = useState(initialPosition);
   const [history, setHistory] = useState([]);
@@ -57,6 +70,13 @@ export default function Chess({ onExit }) {
   const [lastMove, setLastMove] = useState(null);
   const [thinking, setThinking] = useState(false);
   const [best, setBest] = useState(null);
+
+  // The board draws `renderBoard`, which lags `pos` for the length of a move
+  // animation. Without the lag the piece would already be at its destination
+  // while the sliding copy was still travelling.
+  const [renderBoard, setRenderBoard] = useState(() => pos.board);
+  const [anim, setAnim] = useState(null);      // { parts: [{piece, from, to}] }
+  const slide = useRef(new Animated.Value(0)).current;
 
   const level = LEVELS[levelIndex];
   const status = useMemo(() => gameStatus(pos), [pos]);
@@ -72,7 +92,10 @@ export default function Chess({ onExit }) {
   );
 
   const restart = useCallback(() => {
-    setPos(initialPosition());
+    const fresh = initialPosition();
+    setPos(fresh);
+    setRenderBoard(fresh.board);
+    setAnim(null);
     setHistory([]);
     setFrom(null);
     setLastMove(null);
@@ -80,28 +103,65 @@ export default function Chess({ onExit }) {
 
   const applyMove = useCallback((move, current) => {
     const next = makeMove(current, move);
+
+    // The king and the rook both travel when castling.
+    const parts = [{ piece: current.board[move.from], from: move.from, to: move.to }];
+    if (move.castle) {
+      const home = colorOf(current.board[move.from]) === WHITE ? 60 : 4;
+      parts.push(
+        move.castle === 'k'
+          ? { piece: current.board[home + 3], from: home + 3, to: home + 1 }
+          : { piece: current.board[home - 4], from: home - 4, to: home - 1 }
+      );
+    }
+
     setHistory((h) => [...h, current]);
     setPos(next);
     setLastMove(move);
+    setAnim({ parts });
+    slide.setValue(0);
+    Animated.timing(slide, {
+      toValue: 1, duration: ANIM_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    }).start(() => {
+      setRenderBoard(next.board);
+      setAnim(null);
+    });
+
     if (move.promo) fx('merge', 'success');
     else if (next.captured) fx('place', 'medium');
     else play('move');
     return next;
-  }, []);
+  }, [slide]);
 
   // The engine runs on a timer so the board repaints with the player's move
   // first -- otherwise the UI freezes mid-search and the move appears late.
   useEffect(() => {
     if (pos.turn !== BLACK || over) return undefined;
     setThinking(true);
-    const id = setTimeout(() => {
+
+    // Pause for a plausible length of time even when the search was instant.
+    // A bot that answers in 3ms does not read as an opponent, and the weaker
+    // levels finish almost immediately -- so the wait is padding, not search.
+    const target = level.think[0] + Math.random() * (level.think[1] - level.think[0]);
+    const started = Date.now();
+    let waitId = null;
+
+    const searchId = setTimeout(() => {
       const move = chooseMove(pos, {
         depth: level.depth, blunder: level.blunder, budgetMs: level.budget,
       });
+      const remaining = Math.max(0, target - (Date.now() - started));
+      waitId = setTimeout(() => {
+        setThinking(false);
+        if (move) applyMove(move, pos);
+      }, remaining);
+    }, 60);
+
+    return () => {
+      clearTimeout(searchId);
+      if (waitId) clearTimeout(waitId);
       setThinking(false);
-      if (move) applyMove(move, pos);
-    }, 120);
-    return () => { clearTimeout(id); setThinking(false); };
+    };
   }, [pos, over, level, applyMove]);
 
   useEffect(() => {
@@ -117,7 +177,7 @@ export default function Chess({ onExit }) {
   }, [status]);
 
   const tap = useCallback((square) => {
-    if (!yourTurn) return;
+    if (!yourTurn || anim) return;
     const move = targets.find((m) => m.to === square);
     if (move) {
       // Promotion is always to a queen: underpromotion matters so rarely that a
@@ -134,13 +194,16 @@ export default function Chess({ onExit }) {
     } else {
       setFrom(null);
     }
-  }, [yourTurn, targets, pos, applyMove]);
+  }, [yourTurn, anim, targets, pos, applyMove]);
 
   const undo = useCallback(() => {
     if (!history.length) return;
     // Step back a full move where possible, so it is your turn again.
     const back = history.length >= 2 ? 2 : 1;
-    setPos(history[history.length - back]);
+    const previous = history[history.length - back];
+    setPos(previous);
+    setRenderBoard(previous.board);
+    setAnim(null);
     setHistory((h) => h.slice(0, h.length - back));
     setFrom(null);
     setLastMove(null);
@@ -201,7 +264,8 @@ export default function Chess({ onExit }) {
             const rank = Math.floor(i / 8);
             const file = i % 8;
             const dark = (rank + file) % 2 === 1;
-            const piece = pos.board[i];
+            const travelling = anim && anim.parts.some((p) => p.from === i);
+            const piece = travelling ? null : renderBoard[i];
             const isTarget = targets.some((m) => m.to === i);
             const isFrom = from === i;
             const wasMove = lastMove && (lastMove.from === i || lastMove.to === i);
@@ -226,6 +290,32 @@ export default function Chess({ onExit }) {
                 {isTarget && !piece && <View style={s.dot} />}
                 {isTarget && !!piece && <View style={s.captureRing} />}
               </Pressable>
+            );
+          })}
+
+          {/* The pieces actually in motion, drawn above the squares. */}
+          {!!anim && anim.parts.map((p, n) => {
+            const a = squareXY(p.from);
+            const b = squareXY(p.to);
+            return (
+              <Animated.View
+                key={n}
+                pointerEvents="none"
+                style={[
+                  s.square,
+                  {
+                    width: CELL, height: CELL, left: a.x, top: a.y,
+                    transform: [
+                      { translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, b.x - a.x] }) },
+                      { translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [0, b.y - a.y] }) },
+                    ],
+                  },
+                ]}
+              >
+                <Text style={[s.piece, colorOf(p.piece) === WHITE ? s.white : s.black]}>
+                  {GLYPH[p.piece]}
+                </Text>
+              </Animated.View>
             );
           })}
         </View>
@@ -265,18 +355,28 @@ export default function Chess({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   boardWrap: { alignItems: 'center' },
   board: { borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: T.border },
   square: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  light: { backgroundColor: '#3A4658' },
-  dark: { backgroundColor: '#222C3C' },
-  lastMove: { backgroundColor: '#4A5540' },
+  light: { backgroundColor: T.squareLight },
+  dark: { backgroundColor: T.squareDark },
+  lastMove: { backgroundColor: T.squareMove },
   selected: { backgroundColor: T.cyan + '55' },
   inCheck: { backgroundColor: T.red + '66' },
   piece: { fontSize: CELL * 0.78, lineHeight: CELL * 0.96 },
-  white: { color: '#FFFFFF', textShadowColor: '#000', textShadowRadius: 2 },
-  black: { color: '#10141C', textShadowColor: '#FFFFFF55', textShadowRadius: 1 },
+  white: {
+    color: T.pieceWhite,
+    // A halo rather than a drop shadow: it has to hold the shape on both
+    // square colours, in both themes.
+    textShadowColor: '#000000CC', textShadowRadius: 3,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  black: {
+    color: T.pieceBlack,
+    textShadowColor: '#FFFFFF66', textShadowRadius: 2,
+    textShadowOffset: { width: 0, height: 0 },
+  },
   dot: {
     position: 'absolute', width: CELL * 0.26, height: CELL * 0.26,
     borderRadius: CELL, backgroundColor: '#FFFFFF66',

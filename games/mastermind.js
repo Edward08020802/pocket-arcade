@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { T, SPECTRUM } from '../theme';
+import { SPECTRUM, useTheme } from '../theme';
 import { Banner, Btn, GameFrame, Pop, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -29,6 +29,7 @@ function score(guess, code) {
 }
 
 export default function Mastermind({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [code, setCode] = useState(secret);
   const [rows, setRows] = useState([]);
   const [draft, setDraft] = useState(Array(SLOTS).fill(null));
@@ -183,7 +184,7 @@ export default function Mastermind({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 7,
     backgroundColor: T.card, borderRadius: 12, paddingVertical: 7,

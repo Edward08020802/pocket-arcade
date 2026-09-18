@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -8,16 +8,17 @@ import { fx, play } from '../sound';
 // Each pad gets its own sound, so the sequence is learnable by ear as well as
 // by sight -- which is how the original toy worked.
 const PADS = [
-  { key: 0, color: T.green, sfx: 'select' },
-  { key: 1, color: T.red, sfx: 'move' },
-  { key: 2, color: T.cyan, sfx: 'tap' },
-  { key: 3, color: T.amber, sfx: 'merge' },
+  { key: 0, color: '#10B981', sfx: 'select' },
+  { key: 1, color: '#EF4444', sfx: 'move' },
+  { key: 2, color: '#0EA5E9', sfx: 'tap' },
+  { key: 3, color: '#F59E0B', sfx: 'merge' },
 ];
 const PAD = Math.min((WIN.width - 60) / 2, 150);
 const SHOW_MS = 420;
 const GAP_MS = 180;
 
 export default function Simon({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [seq, setSeq] = useState([]);
   const [step, setStep] = useState(0);        // how far the player has replayed
   const [lit, setLit] = useState(null);
@@ -134,6 +135,7 @@ export default function Simon({ onExit }) {
 
 /** Lights and swells together, so a flash is visible even at a glance. */
 function Pad({ pad, lit, disabled, onPress }) {
+  const { T, s } = useTheme(makeStyles);
   const grow = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.spring(grow, {
@@ -157,7 +159,7 @@ function Pad({ pad, lit, disabled, onPress }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   pads: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 12,
     width: PAD * 2 + 12, justifyContent: 'center',

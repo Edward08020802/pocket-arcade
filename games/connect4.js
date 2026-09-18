@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -124,6 +124,7 @@ const LEVELS = {
 };
 
 export default function ConnectFour({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [board, setBoard] = useState(emptyBoard);
   const [turn, setTurn] = useState(YOU);
   const [streak, setStreak] = useState(0);
@@ -257,6 +258,7 @@ export default function ConnectFour({ onExit }) {
  * in the winning four keeps pulsing.
  */
 function Disc({ value, row, winning }) {
+  const { T, s } = useTheme(makeStyles);
   const fall = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
   const prev = useRef(value);
@@ -300,13 +302,13 @@ function Disc({ value, row, winning }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: {
-    backgroundColor: '#182238', borderRadius: 14, padding: 4,
+    backgroundColor: T.frame, borderRadius: 14, padding: 4,
     borderWidth: 1, borderColor: T.border,
   },
   cell: { alignItems: 'center', justifyContent: 'center' },
-  disc: { backgroundColor: '#0E1422' },
-  winning: { borderWidth: 3, borderColor: '#FFFFFF' },
+  disc: { backgroundColor: T.hole },
+  winning: { borderWidth: 3, borderColor: T.text },
   hint: { color: T.dim, fontSize: 12, textAlign: 'center' },
 });

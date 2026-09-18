@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { T } from '../theme';
-import { Banner, Btn, GameFrame, WIN, useSwipe } from '../ui';
+import { Banner, Btn, GameFrame, Pop, WIN, useSwipe } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const N = 4;
 const GAP = 8;
@@ -99,6 +100,7 @@ export default function Twenty48({ onExit }) {
     setGrid((cur) => {
       const { grid: next, gained, moved } = move(cur, dir);
       if (!moved) return cur;
+      play(gained ? 'merge' : 'move');
       if (gained) setScore((n) => n + gained);
       if (!keepGoing && next.some((r) => r.some((v) => v >= 2048))) setWon(true);
       return spawn(next);
@@ -128,8 +130,10 @@ export default function Twenty48({ onExit }) {
             row.map((v, x) => {
               const [bg, fg] = tileStyle(v);
               return (
-                <View
+                <Pop
                   key={`${x}-${y}`}
+                  trigger={v}
+                  from={v ? 0.7 : 1}
                   style={[
                     s.tile,
                     {
@@ -150,7 +154,7 @@ export default function Twenty48({ onExit }) {
                       {v}
                     </Text>
                   )}
-                </View>
+                </Pop>
               );
             })
           )}

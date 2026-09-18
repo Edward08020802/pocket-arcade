@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { T, SPECTRUM } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const COLS = 4;
 const ROWS = 5;                       // 20 cards = 10 pairs
@@ -55,22 +56,26 @@ export default function Memory({ onExit }) {
     if (up.length !== 2) return undefined;
     const [a, b] = up;
     if (deck[a].pair === deck[b].pair) {
+      fx('merge', 'success');
       setDone((prev) => new Set([...prev, a, b]));
       setUp([]);
       return undefined;
     }
+    play('error');
     const id = setTimeout(() => setUp([]), 750);
     return () => clearTimeout(id);
   }, [up, deck]);
 
   useEffect(() => {
     if (!won) return;
+    fx('win', 'success');
     submitScore('memory', moves, false).then((b) => { if (b) setBest(moves); });
   }, [won, moves]);
 
   const flip = useCallback((i) => {
     setUp((prev) => {
       if (prev.length >= 2 || prev.includes(i) || done.has(i)) return prev;
+      play('flip');
       if (prev.length === 1) setMoves((n) => n + 1);
       return [...prev, i];
     });
@@ -89,30 +94,15 @@ export default function Memory({ onExit }) {
       footer={<Text style={s.hint}>Find every pair in as few moves as you can</Text>}
     >
       <View style={[s.board, { width: BOARD }]}>
-        {deck.map((card, i) => {
-          const shown = up.includes(i) || done.has(i);
-          const tint = SPECTRUM[card.pair % SPECTRUM.length];
-          return (
-            <Pressable
-              key={card.id}
-              onPress={() => flip(i)}
-              style={[
-                s.card,
-                { width: CARD, height: CARD },
-                shown
-                  ? { backgroundColor: tint + '22', borderColor: tint }
-                  : s.faceDown,
-                done.has(i) && { opacity: 0.45 },
-              ]}
-            >
-              {shown ? (
-                <Ionicons name={card.icon} size={CARD * 0.44} color={tint} />
-              ) : (
-                <Ionicons name="help" size={CARD * 0.3} color={T.dim} />
-              )}
-            </Pressable>
-          );
-        })}
+        {deck.map((card, i) => (
+          <Tile
+            key={card.id}
+            card={card}
+            shown={up.includes(i) || done.has(i)}
+            matched={done.has(i)}
+            onPress={() => flip(i)}
+          />
+        ))}
 
         {won && (
           <Banner title="All matched!" tint={T.green} detail={`${moves} moves · ${seconds}s.`}>
@@ -123,6 +113,48 @@ export default function Memory({ onExit }) {
         )}
       </View>
     </GameFrame>
+  );
+}
+
+/**
+ * A card that turns over rather than swapping contents: scaleX runs 1 -> 0 -> 1
+ * and the face is only swapped at the midpoint, which reads as a flip without
+ * needing a 3D transform.
+ */
+function Tile({ card, shown, matched, onPress }) {
+  const spin = useRef(new Animated.Value(shown ? 1 : 0)).current;
+  const [face, setFace] = useState(shown);
+
+  useEffect(() => {
+    const half = 130;
+    Animated.timing(spin, {
+      toValue: shown ? 1 : 0, duration: half * 2,
+      easing: Easing.inOut(Easing.quad), useNativeDriver: true,
+    }).start();
+    const id = setTimeout(() => setFace(shown), half);
+    return () => clearTimeout(id);
+  }, [shown, spin]);
+
+  const scaleX = spin.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.05, 1] });
+  const tint = SPECTRUM[card.pair % SPECTRUM.length];
+
+  return (
+    <Pressable onPress={onPress}>
+      <Animated.View
+        style={[
+          s.card,
+          { width: CARD, height: CARD, transform: [{ scaleX }] },
+          face ? { backgroundColor: tint + '22', borderColor: tint } : s.faceDown,
+          matched && { opacity: 0.45 },
+        ]}
+      >
+        {face ? (
+          <Ionicons name={card.icon} size={CARD * 0.44} color={tint} />
+        ) : (
+          <Ionicons name="help" size={CARD * 0.3} color={T.dim} />
+        )}
+      </Animated.View>
+    </Pressable>
   );
 }
 

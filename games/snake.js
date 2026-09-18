@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useSwipe, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const COLS = 15;
 const ROWS = 19;
@@ -67,6 +68,7 @@ export default function Snake({ onExit }) {
     const cur = queued.current || dir.current;
     // Refuse a straight reversal -- it would run the head into the neck.
     if (next.x === -cur.x && next.y === -cur.y) return;
+    play('move');
     queued.current = next;
   }, []);
 
@@ -83,6 +85,7 @@ export default function Snake({ onExit }) {
         y: prev[0].y + dir.current.y,
       };
       if (head.x < 0 || head.y < 0 || head.x >= COLS || head.y >= ROWS) {
+        fx('lose', 'error');
         setOver(true);
         return prev;
       }
@@ -91,11 +94,13 @@ export default function Snake({ onExit }) {
       const eating = food && head.x === food.x && head.y === food.y;
       const body = eating ? prev : prev.slice(0, -1);
       if (body.some((p) => p.x === head.x && p.y === head.y)) {
+        fx('lose', 'error');
         setOver(true);
         return prev;
       }
       const next = [head, ...body];
       if (eating) {
+        play('merge');
         setScore((n) => n + 1);
         const f = randomFood(next);
         setFood(f);
@@ -146,13 +151,13 @@ export default function Snake({ onExit }) {
                 const idx = occupied.get(`${x},${y}`);
                 const isFood = food && food.x === x && food.y === y;
                 const isHead = idx === 0;
+                if (isFood) return <Food key={x} />;
                 return (
                   <View
                     key={x}
                     style={[
                       { width: CELL, height: CELL },
                       s.cell,
-                      isFood && s.food,
                       idx != null && s.snake,
                       isHead && s.head,
                     ]}
@@ -181,6 +186,27 @@ export default function Snake({ onExit }) {
   );
 }
 
+/** The apple breathes, so it is easy to spot on a busy board. */
+function Food() {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 520, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  const scale = v.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] });
+  return (
+    <View style={[{ width: CELL, height: CELL }, s.cell, s.foodCell]}>
+      <Animated.View style={[s.food, { transform: [{ scale }] }]} />
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   boardWrap: { alignItems: 'center' },
   board: {
@@ -190,6 +216,10 @@ const s = StyleSheet.create({
   cell: { borderWidth: 0.5, borderColor: '#00000018' },
   snake: { backgroundColor: T.green, borderRadius: 3 },
   head: { backgroundColor: T.lime },
-  food: { backgroundColor: T.amber, borderRadius: CELL / 2 },
+  foodCell: { alignItems: 'center', justifyContent: 'center' },
+  food: {
+    width: CELL * 0.78, height: CELL * 0.78,
+    backgroundColor: T.amber, borderRadius: CELL,
+  },
   hint: { color: T.dim, fontSize: 12, marginTop: 10 },
 });

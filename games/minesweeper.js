@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const COLS = 9;
 const ROWS = 12;
@@ -86,6 +87,7 @@ export default function Minesweeper({ onExit }) {
     if (!field) setField(f);
 
     if (f.counts[key(x, y)] === -1) {
+      fx('boom', 'error');
       setRevealed((prev) => new Set([...prev, ...f.mines]));
       setDead(true);
       return;
@@ -106,6 +108,8 @@ export default function Minesweeper({ onExit }) {
       }
     }
     setRevealed(next);
+    if (next.size === COLS * ROWS - MINES) fx('win', 'success');
+    else play('tap');
     if (next.size === COLS * ROWS - MINES) setWon(true);
   }, [field, revealed, flags, dead, won]);
 
@@ -115,6 +119,7 @@ export default function Minesweeper({ onExit }) {
       const next = new Set(prev);
       const k = key(x, y);
       if (next.has(k)) next.delete(k); else next.add(k);
+      fx('select', 'medium');
       return next;
     });
   }, [dead, won, revealed]);

@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
+// Each pad gets its own sound, so the sequence is learnable by ear as well as
+// by sight -- which is how the original toy worked.
 const PADS = [
-  { key: 0, color: T.green },
-  { key: 1, color: T.red },
-  { key: 2, color: T.cyan },
-  { key: 3, color: T.amber },
+  { key: 0, color: T.green, sfx: 'select' },
+  { key: 1, color: T.red, sfx: 'move' },
+  { key: 2, color: T.cyan, sfx: 'tap' },
+  { key: 3, color: T.amber, sfx: 'merge' },
 ];
 const PAD = Math.min((WIN.width - 60) / 2, 150);
 const SHOW_MS = 420;
@@ -36,7 +39,10 @@ export default function Simon({ onExit }) {
     clearTimers();
     setPhase('showing');
     full.forEach((pad, i) => {
-      timers.current.push(setTimeout(() => setLit(pad), i * (SHOW_MS + GAP_MS)));
+      timers.current.push(setTimeout(() => {
+        setLit(pad);
+        play(PADS[pad].sfx);
+      }, i * (SHOW_MS + GAP_MS)));
       timers.current.push(setTimeout(() => setLit(null), i * (SHOW_MS + GAP_MS) + SHOW_MS));
     });
     timers.current.push(
@@ -63,10 +69,12 @@ export default function Simon({ onExit }) {
 
   const press = useCallback((pad) => {
     if (phase !== 'input') return;
+    fx(PADS[pad].sfx, 'light');
     setLit(pad);
     timers.current.push(setTimeout(() => setLit(null), 150));
 
     if (seq[step] !== pad) {
+      fx('lose', 'error');
       setPhase('over');
       submitScore('simon', seq.length - 1).then((b) => {
         if (b) setBest(seq.length - 1);
@@ -103,15 +111,12 @@ export default function Simon({ onExit }) {
     >
       <View style={s.pads}>
         {PADS.map((p) => (
-          <Pressable
+          <Pad
             key={p.key}
-            onPress={() => press(p.key)}
+            pad={p}
+            lit={lit === p.key}
             disabled={phase !== 'input'}
-            style={[
-              s.pad,
-              { width: PAD, height: PAD, backgroundColor: p.color + (lit === p.key ? 'FF' : '2E'),
-                borderColor: p.color + (lit === p.key ? 'FF' : '66') },
-            ]}
+            onPress={() => press(p.key)}
           />
         ))}
       </View>
@@ -124,6 +129,31 @@ export default function Simon({ onExit }) {
         </Banner>
       )}
     </GameFrame>
+  );
+}
+
+/** Lights and swells together, so a flash is visible even at a glance. */
+function Pad({ pad, lit, disabled, onPress }) {
+  const grow = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.spring(grow, {
+      toValue: lit ? 1.08 : 1, useNativeDriver: true, friction: 4, tension: 200,
+    }).start();
+  }, [lit, grow]);
+  return (
+    <Pressable onPress={onPress} disabled={disabled}>
+      <Animated.View
+        style={[
+          s.pad,
+          {
+            width: PAD, height: PAD,
+            backgroundColor: pad.color + (lit ? 'FF' : '2E'),
+            borderColor: pad.color + (lit ? 'FF' : '66'),
+            transform: [{ scale: grow }],
+          },
+        ]}
+      />
+    </Pressable>
   );
 }
 

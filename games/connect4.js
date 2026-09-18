@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { T } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
+import { fx, play } from '../sound';
 
 const COLS = 7;
 const ROWS = 6;
@@ -109,13 +110,27 @@ function minimax(b, depth, alpha, beta, maximising) {
   return { score: value, col: bestCol };
 }
 
+/**
+ * Difficulty is search depth plus a blunder rate: at the easy end the CPU often
+ * plays a random legal column instead of its best, which is a far more natural
+ * kind of weakness than a shallow search alone (a depth-1 engine still never
+ * misses an immediate win, which feels oddly sharp for an "easy" opponent).
+ */
+const LEVELS = {
+  Easy: { depth: 1, blunder: 0.45 },
+  Normal: { depth: 3, blunder: 0.15 },
+  Hard: { depth: 5, blunder: 0 },
+  Brutal: { depth: 7, blunder: 0 },
+};
+
 export default function ConnectFour({ onExit }) {
   const [board, setBoard] = useState(emptyBoard);
   const [turn, setTurn] = useState(YOU);
   const [streak, setStreak] = useState(0);
   const [best, setBest] = useState(null);
+  const [level, setLevel] = useState('Normal');
 
-  useEffect(() => { getBest('connect4').then(setBest); }, []);
+  useEffect(() => { getBest(`connect4-${level}`).then(setBest); }, [level]);
 
   const win = winner(board);
   const full = legalCols(board).length === 0;
@@ -126,10 +141,18 @@ export default function ConnectFour({ onExit }) {
     setTurn(YOU);
   }, []);
 
+  const changeLevel = useCallback((lv) => {
+    setLevel(lv);
+    setBoard(emptyBoard());
+    setTurn(YOU);
+    setStreak(0);
+  }, []);
+
   const playerDrop = useCallback((c) => {
     if (finished || turn !== YOU) return;
     const next = drop(board, c, YOU);
-    if (!next) return;
+    if (!next) { fx('error', 'warning'); return; }
+    fx('drop', 'medium');
     setBoard(next);
     setTurn(CPU);
   }, [board, turn, finished]);
@@ -138,21 +161,30 @@ export default function ConnectFour({ onExit }) {
   useEffect(() => {
     if (turn !== CPU || finished) return undefined;
     const id = setTimeout(() => {
-      const { col } = minimax(board, 4, -Infinity, Infinity, true);
-      const next = drop(board, col ?? legalCols(board)[0], CPU);
-      if (next) setBoard(next);
+      const { depth, blunder } = LEVELS[level];
+      const options = legalCols(board);
+      let col;
+      if (blunder > 0 && Math.random() < blunder) {
+        col = options[Math.floor(Math.random() * options.length)];
+      } else {
+        col = minimax(board, depth, -Infinity, Infinity, true).col;
+      }
+      const next = drop(board, col ?? options[0], CPU);
+      if (next) { play('drop'); setBoard(next); }
       setTurn(YOU);
     }, 320);
     return () => clearTimeout(id);
-  }, [turn, board, finished]);
+  }, [turn, board, finished, level]);
 
   useEffect(() => {
     if (!win) return;
     if (win.who === YOU) {
+      fx('win', 'success');
       const n = streak + 1;
       setStreak(n);
-      submitScore('connect4', n).then((b) => { if (b) setBest(n); });
+      submitScore(`connect4-${level}`, n).then((b) => { if (b) setBest(n); });
     } else {
+      fx('lose', 'error');
       setStreak(0);
     }
   }, [win]);
@@ -167,10 +199,26 @@ export default function ConnectFour({ onExit }) {
       stats={[
         { label: 'TURN', value: finished ? '—' : turn === YOU ? 'You' : 'CPU',
           color: turn === YOU ? T.amber : T.cyan },
+        { label: 'LEVEL', value: level, color: T.violet },
         { label: 'STREAK', value: streak },
         { label: 'BEST', value: best ?? '—' },
       ]}
-      footer={<Text style={s.hint}>Tap a column to drop · four in a row wins</Text>}
+      footer={
+        <>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            {Object.keys(LEVELS).map((lv) => (
+              <Btn
+                key={lv}
+                label={lv}
+                flex={1}
+                color={lv === level ? T.violet : T.dim}
+                onPress={() => changeLevel(lv)}
+              />
+            ))}
+          </View>
+          <Text style={s.hint}>Tap a column to drop · four in a row wins</Text>
+        </>
+      }
     >
       <View style={s.board}>
         {board.map((row, r) => (
@@ -181,15 +229,7 @@ export default function ConnectFour({ onExit }) {
                 onPress={() => playerDrop(c)}
                 style={[s.cell, { width: CELL, height: CELL }]}
               >
-                <View
-                  style={[
-                    s.disc,
-                    { width: CELL * 0.78, height: CELL * 0.78, borderRadius: CELL },
-                    v === YOU && { backgroundColor: T.amber },
-                    v === CPU && { backgroundColor: T.cyan },
-                    highlight.has(`${r},${c}`) && s.winning,
-                  ]}
-                />
+                <Disc value={v} row={r} winning={highlight.has(`${r},${c}`)} />
               </Pressable>
             ))}
           </View>
@@ -208,6 +248,55 @@ export default function ConnectFour({ onExit }) {
         )}
       </View>
     </GameFrame>
+  );
+}
+
+/**
+ * One cell. When it goes from empty to filled it drops in from above its own
+ * row, so the disc visibly falls the distance it would really fall, and a disc
+ * in the winning four keeps pulsing.
+ */
+function Disc({ value, row, winning }) {
+  const fall = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
+  const prev = useRef(value);
+
+  useEffect(() => {
+    if (prev.current === 0 && value !== 0) {
+      fall.setValue(-(row + 1) * CELL);
+      Animated.timing(fall, {
+        toValue: 0,
+        duration: 120 + row * 45,
+        easing: Easing.bounce,
+        useNativeDriver: true,
+      }).start();
+    }
+    prev.current = value;
+  }, [value, row, fall]);
+
+  useEffect(() => {
+    if (!winning) { pulse.setValue(1); return undefined; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.18, duration: 380, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 380, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [winning, pulse]);
+
+  return (
+    <Animated.View
+      style={[
+        s.disc,
+        { width: CELL * 0.78, height: CELL * 0.78, borderRadius: CELL },
+        value === YOU && { backgroundColor: T.amber },
+        value === CPU && { backgroundColor: T.cyan },
+        winning && s.winning,
+        { transform: [{ translateY: fall }, { scale: pulse }] },
+      ]}
+    />
   );
 }
 

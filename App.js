@@ -178,13 +178,66 @@ function Root() {
   );
 }
 
+/**
+ * Catches render errors and shows them.
+ *
+ * A JS exception in a release build renders nothing at all -- the app just
+ * launches to a blank screen with no way to tell what failed. This draws the
+ * message instead, with hardcoded styles and no imports of its own, so it
+ * cannot fail for the same reason the thing it is reporting on did.
+ */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null, extra: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidMount() {
+    // Errors outside render -- async callbacks, timers, native events.
+    const handler = global.ErrorUtils && global.ErrorUtils.getGlobalHandler
+      ? global.ErrorUtils.getGlobalHandler()
+      : null;
+    if (global.ErrorUtils && global.ErrorUtils.setGlobalHandler) {
+      global.ErrorUtils.setGlobalHandler((error, isFatal) => {
+        this.setState({ extra: `${isFatal ? 'FATAL ' : ''}${error && (error.stack || error.message)}` });
+        if (handler) handler(error, isFatal);
+      });
+    }
+  }
+
+  render() {
+    const { error, extra } = this.state;
+    if (!error && !extra) return this.props.children;
+    const text = error ? (error.stack || error.message || String(error)) : extra;
+    return (
+      <ScrollView
+        style={{ flex: 1, backgroundColor: '#1A0C10' }}
+        contentContainerStyle={{ padding: 18, paddingTop: 70 }}
+      >
+        <Text style={{ color: '#FF8FA6', fontSize: 17, fontWeight: '800', marginBottom: 10 }}>
+          Pocket Arcade crashed
+        </Text>
+        <Text style={{ color: '#FFD7DF', fontSize: 11, lineHeight: 16 }} selectable>
+          {String(text)}
+        </Text>
+      </ScrollView>
+    );
+  }
+}
+
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <Root />
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <Root />
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

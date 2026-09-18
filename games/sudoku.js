@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -86,6 +86,7 @@ function generate(clues) {
 }
 
 export default function Sudoku({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [level, setLevel] = useState('Easy');
   const [{ puzzle, solution }, setGame] = useState(() => generate(DIFFICULTY.Easy));
   const [cells, setCells] = useState(() => puzzleCells(puzzle));
@@ -226,19 +227,19 @@ export default function Sudoku({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: {
     backgroundColor: T.card, borderRadius: 10, overflow: 'hidden',
     borderWidth: 2, borderColor: T.border,
   },
   cell: {
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 0.5, borderColor: '#2A3240', backgroundColor: '#0F1420',
+    borderWidth: 0.5, borderColor: T.border, backgroundColor: T.well,
   },
   rightEdge: { borderRightWidth: 2, borderRightColor: T.border },
   bottomEdge: { borderBottomWidth: 2, borderBottomColor: T.border },
-  peer: { backgroundColor: '#151C2A' },
-  same: { backgroundColor: '#1D2A3A' },
+  peer: { backgroundColor: T.wellAlt },
+  same: { backgroundColor: T.cardHi },
   selected: { backgroundColor: T.cyan + '33' },
   num: { fontWeight: '800' },
   fixed: { color: T.text },

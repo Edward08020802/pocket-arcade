@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
-import { T, SPECTRUM } from '../theme';
+import { SPECTRUM, useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -27,6 +27,7 @@ const makeBricks = (level) =>
   }));
 
 export default function Breakout({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [bricks, setBricks] = useState(() => makeBricks(1));
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -224,9 +225,9 @@ export default function Breakout({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: {
-    backgroundColor: '#0F1420', borderRadius: 12, overflow: 'hidden',
+    backgroundColor: T.well, borderRadius: 12, overflow: 'hidden',
     borderWidth: 1, borderColor: T.border,
   },
   ball: {

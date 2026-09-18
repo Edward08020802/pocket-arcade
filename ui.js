@@ -4,13 +4,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { T } from './theme';
+import { useTheme } from './theme';
 import { fx, useMuted } from './sound';
 
 export const WIN = Dimensions.get('window');
 
 /** Screen chrome shared by every game: title, back, score line, restart. */
 export function GameFrame({ title, onExit, onRestart, stats = [], children, footer }) {
+  const { T, s, theme, toggle } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const [muted, toggleMute] = useMuted();
   return (
@@ -24,6 +25,13 @@ export function GameFrame({ title, onExit, onRestart, stats = [], children, foot
           <Ionicons name="chevron-back" size={22} color={T.cyan} />
         </Pressable>
         <Text style={s.title} numberOfLines={1}>{title}</Text>
+        <Pressable
+          onPress={() => { fx('tap'); toggle(); }}
+          hitSlop={10}
+          style={({ pressed }) => [s.iconBtn, pressed && s.pressed]}
+        >
+          <Ionicons name={theme === 'dark' ? 'moon' : 'sunny'} size={18} color={T.amber} />
+        </Pressable>
         <Pressable
           onPress={toggleMute}
           hitSlop={10}
@@ -67,7 +75,9 @@ export function GameFrame({ title, onExit, onRestart, stats = [], children, foot
 }
 
 /** Full-width action button. */
-export function Btn({ label, icon, color = T.cyan, onPress, disabled, flex, sfx = 'tap' }) {
+export function Btn({ label, icon, color, onPress, disabled, flex, sfx = 'tap' }) {
+  const { T, s } = useTheme(makeStyles);
+  const tint = color || T.cyan;
   return (
     <Pressable
       onPress={() => { if (sfx) fx(sfx); onPress?.(); }}
@@ -75,19 +85,21 @@ export function Btn({ label, icon, color = T.cyan, onPress, disabled, flex, sfx 
       style={({ pressed }) => [
         s.btn,
         !!flex && { flex },
-        { borderColor: color + '55', backgroundColor: color + '14' },
+        { borderColor: tint + '55', backgroundColor: tint + '14' },
         pressed && s.pressed,
         !!disabled && { opacity: 0.4 },
       ]}
     >
-      {!!icon && <Ionicons name={icon} size={17} color={color} />}
-      <Text style={[s.btnText, { color }]}>{label}</Text>
+      {!!icon && <Ionicons name={icon} size={17} color={tint} />}
+      <Text style={[s.btnText, { color: tint }]}>{label}</Text>
     </Pressable>
   );
 }
 
 /** Centred overlay for win/lose, drawn above the board rather than as an alert. */
-export function Banner({ title, detail, tint = T.green, children }) {
+export function Banner({ title, detail, tint: tintProp, children }) {
+  const { T, s } = useTheme(makeStyles);
+  const tint = tintProp || T.green;
   const grow = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.spring(grow, { toValue: 1, useNativeDriver: true, friction: 6, tension: 90 }).start();
@@ -200,18 +212,18 @@ export function useTicker(fn, delay) {
   }, [delay]);
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingBottom: 6, gap: 10,
+    paddingHorizontal: 10, paddingBottom: 6, gap: 7,
   },
   iconBtn: {
-    width: 38, height: 38, borderRadius: 12, alignItems: 'center',
+    width: 36, height: 36, borderRadius: 11, alignItems: 'center',
     justifyContent: 'center', backgroundColor: T.card,
     borderWidth: 1, borderColor: T.border,
   },
-  title: { flex: 1, color: T.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  title: { flex: 1, color: T.text, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   stats: {
     flexDirection: 'row', marginHorizontal: 12, marginTop: 4, marginBottom: 8,
     backgroundColor: T.card, borderRadius: 14, borderWidth: 1,

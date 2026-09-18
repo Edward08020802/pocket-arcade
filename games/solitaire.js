@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -63,6 +63,7 @@ function canFound(card, pile) {
 }
 
 export default function Solitaire({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [game, setGame] = useState(deal);
   const [sel, setSel] = useState(null);     // {from:'waste'|'tableau', col, index}
   const [moves, setMoves] = useState(0);
@@ -287,8 +288,9 @@ export default function Solitaire({ onExit }) {
 }
 
 function Card({ card, selected }) {
+  const { T, s } = useTheme(makeStyles);
   if (!card.up) return <View style={s.back} />;
-  const color = card.red ? '#FF6B8A' : '#DDE5F2';
+  const color = card.red ? T.cardRed : T.cardBlack;
   const sym = SUITS.find((x) => x.key === card.suit).sym;
   return (
     <View style={[s.card, selected && s.selected]}>
@@ -298,21 +300,21 @@ function Card({ card, selected }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   topRow: { flexDirection: 'row', gap: GAP, marginBottom: 14, alignItems: 'flex-start' },
   slot: { width: CARD_W, height: CARD_H },
   stock: { alignItems: 'center', justifyContent: 'center' },
   tableau: { flexDirection: 'row', gap: GAP },
   card: {
-    width: CARD_W, height: CARD_H, borderRadius: 6, backgroundColor: '#1A2231',
-    borderWidth: 1, borderColor: '#2A3446', paddingTop: 2, alignItems: 'center',
+    width: CARD_W, height: CARD_H, borderRadius: 6, backgroundColor: T.cardFace,
+    borderWidth: 1, borderColor: T.cardEdge, paddingTop: 2, alignItems: 'center',
   },
-  selected: { borderColor: T.amber, borderWidth: 2, backgroundColor: '#2A2A1E' },
+  selected: { borderColor: T.amber, borderWidth: 2, backgroundColor: T.amber + '22' },
   back: {
-    width: CARD_W, height: CARD_H, borderRadius: 6, backgroundColor: '#20304A',
-    borderWidth: 1, borderColor: '#33456B', alignItems: 'center', justifyContent: 'center',
+    width: CARD_W, height: CARD_H, borderRadius: 6, backgroundColor: T.cardBack,
+    borderWidth: 1, borderColor: T.cardBackEdge, alignItems: 'center', justifyContent: 'center',
   },
-  backText: { color: '#6E86AD', fontSize: 12, fontWeight: '800' },
+  backText: { color: T.cardBackEdge, fontSize: 12, fontWeight: '800' },
   empty: {
     width: CARD_W, height: CARD_H, borderRadius: 6, borderWidth: 1,
     borderColor: T.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center',

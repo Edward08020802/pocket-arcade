@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -15,6 +15,7 @@ const TARGET = 7;               // first to seven
 const SPEED = 0.30;
 
 export default function Pong({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [you, setYou] = useState(0);
   const [cpu, setCpu] = useState(0);
   const [state, setState] = useState('ready');    // ready | playing | over
@@ -181,9 +182,9 @@ export default function Pong({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: {
-    backgroundColor: '#0F1420', borderRadius: 12, overflow: 'hidden',
+    backgroundColor: T.well, borderRadius: 12, overflow: 'hidden',
     borderWidth: 1, borderColor: T.border,
   },
   midline: {

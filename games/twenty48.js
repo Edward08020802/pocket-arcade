@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, Pop, WIN, useSwipe } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -12,7 +12,7 @@ const CELL = (BOARD - GAP * (N + 1)) / N;
 
 // Warm as the numbers climb, so progress is legible at a glance.
 const TILE = {
-  2: ['#1E2836', T.dim], 4: ['#24324A', '#9FB3D1'],
+  2: ['#1E2836', '#94A3B8'], 4: ['#24324A', '#9FB3D1'],
   8: ['#2B4C6F', '#DCEBFF'], 16: ['#1F6F8B', '#EAF8FF'],
   32: ['#178A78', '#EAFFF9'], 64: ['#2FA65C', '#F1FFF3'],
   128: ['#7AA83A', '#FBFFEF'], 256: ['#B99A2E', '#FFFBEB'],
@@ -78,6 +78,7 @@ const canMove = (g) =>
   ['left', 'right', 'up', 'down'].some((d) => move(g, d).moved);
 
 export default function Twenty48({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [grid, setGrid] = useState(() => spawn(spawn(emptyGrid())));
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(null);
@@ -140,7 +141,7 @@ export default function Twenty48({ onExit }) {
                       width: CELL, height: CELL,
                       left: GAP + x * (CELL + GAP),
                       top: GAP + y * (CELL + GAP),
-                      backgroundColor: v ? bg : '#1C2431',
+                      backgroundColor: v ? bg : T.wellAlt,
                     },
                   ]}
                 >
@@ -183,7 +184,7 @@ export default function Twenty48({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: { backgroundColor: T.card, borderRadius: 14, borderWidth: 1, borderColor: T.border },
   tile: { position: 'absolute', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   tileText: { fontWeight: '900' },

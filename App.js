@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { T } from './theme';
+import { ThemeProvider, useTheme } from './theme';
 import { loadBests } from './storage';
 import { fx, useMuted } from './sound';
 
@@ -85,6 +85,7 @@ const GAMES = [
 ];
 
 function Hub({ onPick }) {
+  const { T, s, theme, toggle } = useTheme(makeStyles);
   const insets = useSafeAreaInsets();
   const [bests, setBests] = useState({});
   const [muted, toggleMute] = useMuted();
@@ -99,6 +100,13 @@ function Hub({ onPick }) {
           <Text style={s.title}>Pocket Arcade</Text>
           <Text style={s.subtitle}>{GAMES.length} games · works with no signal</Text>
         </View>
+        <Pressable
+          onPress={() => { fx('tap'); toggle(); }}
+          hitSlop={12}
+          style={({ pressed }) => [s.muteBtn, { marginRight: 8 }, pressed && s.pressed]}
+        >
+          <Ionicons name={theme === 'dark' ? 'moon' : 'sunny'} size={19} color={T.amber} />
+        </Pressable>
         <Pressable
           onPress={toggleMute}
           hitSlop={12}
@@ -149,23 +157,38 @@ function Hub({ onPick }) {
   );
 }
 
-export default function App() {
+/** Inside the provider, so it can read the palette it is painted with. */
+function Root() {
+  const { T, s, theme } = useTheme(makeStyles);
   const [game, setGame] = useState(null);
   const exit = useCallback(() => setGame(null), []);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={T.bg} />
+    <>
+      <StatusBar
+        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
+        backgroundColor={T.bg}
+      />
       <View style={s.root}>
         {game
           ? <game.Component key={game.key} onExit={exit} />
           : <Hub key="hub" onPick={setGame} />}
       </View>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <Root />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   root: { flex: 1, backgroundColor: T.bg },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 6 },
   muteBtn: {

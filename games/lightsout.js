@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { T } from '../theme';
+import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, Pop, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
@@ -37,6 +37,7 @@ function scramble(presses = 12) {
 }
 
 export default function LightsOut({ onExit }) {
+  const { T, s } = useTheme(makeStyles);
   const [grid, setGrid] = useState(scramble);
   const [moves, setMoves] = useState(0);
   const [best, setBest] = useState(null);
@@ -108,7 +109,7 @@ export default function LightsOut({ onExit }) {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (T) => StyleSheet.create({
   board: { alignItems: 'center' },
   cell: { flex: 1, borderRadius: 12, borderWidth: 1.5 },
   on: { backgroundColor: T.amber + '33', borderColor: T.amber,

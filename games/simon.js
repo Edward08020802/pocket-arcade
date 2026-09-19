@@ -36,7 +36,11 @@ export default function Simon({ onExit }) {
   };
   useEffect(() => clearTimers, []);
 
-  const play = useCallback((full) => {
+  // Named for what it does, and deliberately NOT `play`: that is the sound
+  // helper imported above, and a local binding of the same name shadowed it --
+  // so playing a pad's tone called this instead, with a string where an array
+  // was expected.
+  const showSequence = useCallback((full) => {
     clearTimers();
     setPhase('showing');
     full.forEach((pad, i) => {
@@ -57,8 +61,8 @@ export default function Simon({ onExit }) {
   const extend = useCallback((cur) => {
     const next = [...cur, Math.floor(Math.random() * 4)];
     setSeq(next);
-    play(next);
-  }, [play]);
+    showSequence(next);
+  }, [showSequence]);
 
   const restart = useCallback(() => {
     clearTimers();

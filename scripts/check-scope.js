@@ -44,6 +44,42 @@ function jsFiles(dir) {
 }
 
 let failures = 0;
+
+/**
+ * A local binding that reuses an imported name silently replaces it for the
+ * whole of that scope. Simon declared a local `play` and every call meant to
+ * reach the sound helper hit the local one instead, crashing inside a timer
+ * where no try/catch could see it.
+ */
+function checkShadowedImports(ast, rel, code) {
+  const imported = new Set();
+  traverse(ast, {
+    ImportSpecifier(p) { imported.add(p.node.local.name); },
+    ImportDefaultSpecifier(p) { imported.add(p.node.local.name); },
+    ImportNamespaceSpecifier(p) { imported.add(p.node.local.name); },
+  });
+  const seen = new Set();
+  let found = 0;
+  traverse(ast, {
+    Scopable(p) {
+      if (p.scope.path.isProgram()) return;
+      for (const name of Object.keys(p.scope.bindings)) {
+        if (!imported.has(name)) continue;
+        const line = p.scope.bindings[name].identifier.loc.start.line;
+        const key = `${rel}:${line}:${name}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        console.error(
+          `${rel}:${line}  local '${name}' shadows the import of the same name  ` +
+          `-> ${code.split('\n')[line - 1].trim().slice(0, 80)}`
+        );
+        found++;
+      }
+    },
+  });
+  return found;
+}
+
 for (const file of jsFiles(ROOT)) {
   const code = fs.readFileSync(file, 'utf8');
   let ast;
@@ -57,6 +93,8 @@ for (const file of jsFiles(ROOT)) {
     failures++;
     continue;
   }
+  failures += checkShadowedImports(ast, path.relative(ROOT, file), code);
+
   traverse(ast, {
     ReferencedIdentifier(p) {
       const name = p.node.name;
@@ -72,7 +110,7 @@ for (const file of jsFiles(ROOT)) {
 }
 
 if (failures) {
-  console.error(`\n${failures} unbound reference${failures === 1 ? '' : 's'}.`);
+  console.error(`\n${failures} problem${failures === 1 ? '' : 's'} found.`);
   process.exit(1);
 }
-console.log('scope check passed: no unbound references');
+console.log('scope check passed: no unbound references, no shadowed imports');

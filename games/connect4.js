@@ -142,10 +142,15 @@ export default function ConnectFour({ onExit }) {
     setTurn(YOU);
   }, []);
 
+  const recordStreak = useCallback((n) => {
+    submitScore(`connect4-${level}`, n).then((better) => { if (better) setBest(n); });
+  }, [level]);
+
   const changeLevel = useCallback((lv) => {
     setLevel(lv);
     setBoard(emptyBoard());
     setTurn(YOU);
+    streakRef.current = 0;
     setStreak(0);
   }, []);
 
@@ -177,18 +182,34 @@ export default function ConnectFour({ onExit }) {
     return () => clearTimeout(id);
   }, [turn, board, finished, level]);
 
+  // winner() builds a fresh object on every render, so this effect cannot be
+  // keyed on it -- the dependency never compares equal and the result is
+  // counted again on each repaint, which ran the streak into the thousands.
+  // Key on the outcome, which is a primitive, and settle each game once.
+  const outcome = win ? win.who : null;
+  const settled = useRef(false);
+  const streakRef = useRef(0);
+
   useEffect(() => {
-    if (!win) return;
-    if (win.who === YOU) {
+    if (!outcome) { settled.current = false; return; }
+    if (settled.current) return;
+    settled.current = true;
+
+    if (outcome === YOU) {
       fx('win', 'success');
-      const n = streak + 1;
-      setStreak(n);
-      submitScore(`connect4-${level}`, n).then((b) => { if (b) setBest(n); });
+      // Read the streak from a ref rather than state: saving the score is a
+      // side effect and must not run inside a state updater, which React is
+      // free to call more than once.
+      const next = streakRef.current + 1;
+      streakRef.current = next;
+      setStreak(next);
+      recordStreak(next);
     } else {
       fx('lose', 'error');
+      streakRef.current = 0;
       setStreak(0);
     }
-  }, [win]);
+  }, [outcome, recordStreak]);
 
   const highlight = new Set((win?.cells || []).map(([r, c]) => `${r},${c}`));
 

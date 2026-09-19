@@ -19,6 +19,14 @@ const CELL = BOARD / 8;
 // Unicode's "white" pieces (U+2654..) are outlines, which vanish against a
 // light square -- so White gets the same solid shape in white ink with a dark
 // halo, the way a real set reads.
+// U+FE0E asks for the TEXT presentation of a glyph.
+//
+// Several of these code points -- the pawn especially -- also have an emoji
+// presentation, and iOS picks it by default. An emoji is drawn in its own
+// colours and ignores the text colour entirely, which is why White's pawns came
+// out black. The selector pins them to the plain glyph so the colour applies.
+const TEXT_PRESENTATION = '\uFE0E';
+
 const GLYPH = {
   K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟',
   k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟',
@@ -284,7 +292,7 @@ export default function Chess({ onExit }) {
               >
                 {!!piece && (
                   <Text style={[s.piece, colorOf(piece) === WHITE ? s.white : s.black]}>
-                    {GLYPH[piece]}
+                    {GLYPH[piece] + TEXT_PRESENTATION}
                   </Text>
                 )}
                 {isTarget && !piece && <View style={s.dot} />}
@@ -313,7 +321,7 @@ export default function Chess({ onExit }) {
                 ]}
               >
                 <Text style={[s.piece, colorOf(p.piece) === WHITE ? s.white : s.black]}>
-                  {GLYPH[p.piece]}
+                  {GLYPH[p.piece] + TEXT_PRESENTATION}
                 </Text>
               </Animated.View>
             );

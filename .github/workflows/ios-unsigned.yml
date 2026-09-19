@@ -21,6 +21,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Catches identifiers nothing binds. Metro bundles those without
+      # complaint and they only fail when the module is evaluated on device,
+      # as a launch to a black screen with nothing logged.
+      - name: Scope check
+        run: npm run check
+
       # Generates the native ios/ project from app.json. Not committed (see
       # .gitignore), so it is regenerated on every run.
       - name: Expo prebuild

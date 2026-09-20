@@ -112,8 +112,14 @@ export default function LightsOut({ onExit }) {
 const makeStyles = (T) => StyleSheet.create({
   board: { alignItems: 'center' },
   cell: { flex: 1, borderRadius: 12, borderWidth: 1.5 },
-  on: { backgroundColor: T.amber + '33', borderColor: T.amber,
-        shadowColor: T.amber, shadowOpacity: 0.6, shadowRadius: 10 },
+  // shadowOffset is given explicitly: without it iOS renders the shadow
+  // offscreen and composites it, which is wasted work on 25 cells that all
+  // change together.
+  on: {
+    backgroundColor: T.amber + '33', borderColor: T.amber,
+    shadowColor: T.amber, shadowOpacity: 0.6, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
   off: { backgroundColor: T.card, borderColor: T.border },
   hint: { color: T.dim, fontSize: 12, textAlign: 'center' },
 });

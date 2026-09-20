@@ -112,13 +112,38 @@ export function ThemeProvider({ children }) {
 }
 
 /**
+ * Stylesheets, shared by every component that asks for the same one.
+ *
+ * useMemo alone caches per component *instance*, so a board that renders one
+ * component per cell built a fresh StyleSheet for every cell -- 42 of them in
+ * Connect Four, 20 in Memory, one per card in Blackjack. There are only ever
+ * two palettes, so cache on (makeStyles, palette) instead and hand out the
+ * same object.
+ */
+const styleCache = new WeakMap();
+
+function stylesFor(makeStyles, palette) {
+  let byPalette = styleCache.get(makeStyles);
+  if (!byPalette) {
+    byPalette = new Map();
+    styleCache.set(makeStyles, byPalette);
+  }
+  let sheet = byPalette.get(palette);
+  if (!sheet) {
+    sheet = makeStyles(palette);
+    byPalette.set(palette, sheet);
+  }
+  return sheet;
+}
+
+/**
  * Current palette, plus the stylesheet built from it.
  * Pass the screen's `makeStyles`; omit it if the component only needs colours.
  */
 export function useTheme(makeStyles) {
   const ctx = useContext(ThemeContext);
   const s = useMemo(
-    () => (makeStyles ? makeStyles(ctx.T) : null),
+    () => (makeStyles ? stylesFor(makeStyles, ctx.T) : null),
     [makeStyles, ctx.T]
   );
   return { ...ctx, s };

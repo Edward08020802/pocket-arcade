@@ -10,6 +10,7 @@ const SUITS = [
   { key: 'd', sym: '♦', red: true }, { key: 'c', sym: '♣', red: false },
 ];
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const SUIT_SYM = SUITS.reduce((m, s) => ({ ...m, [s.key]: s.sym }), {});
 const CARD_W = Math.min((WIN.width - 90) / 5, 62);
 const CARD_H = Math.round(CARD_W * 1.42);
 const START_CHIPS = 100;
@@ -53,6 +54,7 @@ export default function Blackjack({ onExit }) {
   const [phase, setPhase] = useState('betting');   // betting | player | dealer | done
   const [result, setResult] = useState(null);
   const [chips, setChips] = useState(START_CHIPS);
+  const chipsRef = useRef(START_CHIPS);
   const [bet, setBet] = useState(10);
   const [best, setBest] = useState(null);
 
@@ -69,6 +71,7 @@ export default function Blackjack({ onExit }) {
     setShoe(freshShoe());
     setPlayer([]); setDealer([]);
     setPhase('betting'); setResult(null);
+    chipsRef.current = START_CHIPS;
     setChips(START_CHIPS); setBet(10);
   }, []);
 
@@ -102,13 +105,15 @@ export default function Blackjack({ onExit }) {
     else if (pv < dv) { outcome = 'Dealer wins'; delta = -bet; }
     else { outcome = 'Push'; delta = 0; }
 
-    setChips((c) => {
-      const next = c + delta;
-      if (next > (best ?? 0)) {
-        submitScore('blackjack', next).then((b) => { if (b) setBest(next); });
-      }
-      return next;
-    });
+    // Track chips in a ref as well, so the score can be saved outside the
+    // updater: React may run an updater more than once, and this was firing a
+    // storage write -- a native bridge call -- twice on every hand.
+    const nextChips = chipsRef.current + delta;
+    chipsRef.current = nextChips;
+    setChips(nextChips);
+    if (nextChips > (best ?? 0)) {
+      submitScore('blackjack', nextChips).then((b) => { if (b) setBest(nextChips); });
+    }
     setResult({ outcome, delta });
     setPhase('done');
     if (delta > 0) fx('win', 'success');
@@ -287,7 +292,7 @@ function DealtCard({ card, index, faceDown }) {
     <Animated.View style={[s.card, style]}>
       <Text style={[s.rank, { color: card.red ? T.cardRed : T.cardBlack }]}>{card.rank}</Text>
       <Text style={[s.suit, { color: card.red ? T.cardRed : T.cardBlack }]}>
-        {SUITS.find((x) => x.key === card.suit).sym}
+        {SUIT_SYM[card.suit]}
       </Text>
     </Animated.View>
   );

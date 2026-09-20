@@ -15,8 +15,10 @@ const CARD_W = Math.min((WIN.width - 90) / 5, 62);
 const CARD_H = Math.round(CARD_W * 1.42);
 const START_CHIPS = 100;
 // Where a card flies in from: roughly where a shoe would sit.
-const DEAL_FROM_X = 150;
-const DEAL_FROM_Y = -110;
+// Room for five cards; hands longer than that simply run on past it.
+const HAND_W = CARD_W * 5 + 6 * 4;
+const DEAL_FROM_X = 96;
+const DEAL_FROM_Y = -68;
 
 function freshShoe() {
   const cards = [];
@@ -217,15 +219,25 @@ export default function Blackjack({ onExit }) {
 
 function Hand({ title, cards, hideLast }) {
   const { s } = useTheme(makeStyles);
+
+  // How many cards were already on the table last render. Cards that were
+  // already here must not be staggered again, and -- more importantly -- a
+  // card drawn by hitting has to start moving immediately. Keyed off the
+  // absolute index it waited index*110ms, so the fourth card sat still for a
+  // third of a second after the tap, which read as the game hanging.
+  const previous = useRef(0);
+  const base = cards.length >= previous.current ? previous.current : 0;
+  useEffect(() => { previous.current = cards.length; });
+
   return (
-    <View style={{ alignItems: 'center' }}>
+    <View style={s.hand}>
       <Text style={s.handTitle}>{title}</Text>
-      <View style={{ flexDirection: 'row', gap: 6, minHeight: CARD_H }}>
+      <View style={s.handRow}>
         {cards.map((c, i) => (
           <DealtCard
             key={`${c.rank}${c.suit}${i}`}
             card={c}
-            index={i}
+            delay={Math.max(0, i - base) * 90}
             faceDown={!!hideLast && i === cards.length - 1}
           />
         ))}
@@ -242,7 +254,7 @@ function Hand({ title, cards, hideLast }) {
  * dealer's hole card additionally turns over in place when it is revealed:
  * scaleX runs to zero and back, and the face is swapped at the midpoint.
  */
-function DealtCard({ card, index, faceDown }) {
+function DealtCard({ card, delay, faceDown }) {
   const { T, s } = useTheme(makeStyles);
   const deal = useRef(new Animated.Value(0)).current;
   const flip = useRef(new Animated.Value(faceDown ? 0 : 1)).current;
@@ -252,12 +264,12 @@ function DealtCard({ card, index, faceDown }) {
   useEffect(() => {
     Animated.timing(deal, {
       toValue: 1,
-      duration: 280,
-      delay: index * 110,
+      duration: 230,
+      delay,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [deal, index]);
+  }, [deal, delay]);
 
   useEffect(() => {
     if (first.current) {
@@ -281,7 +293,7 @@ function DealtCard({ card, index, faceDown }) {
     transform: [
       { translateX: deal.interpolate({ inputRange: [0, 1], outputRange: [DEAL_FROM_X, 0] }) },
       { translateY: deal.interpolate({ inputRange: [0, 1], outputRange: [DEAL_FROM_Y, 0] }) },
-      { rotate: deal.interpolate({ inputRange: [0, 1], outputRange: ['26deg', '0deg'] }) },
+      { rotate: deal.interpolate({ inputRange: [0, 1], outputRange: ['12deg', '0deg'] }) },
       { scaleX: flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.04, 1] }) },
     ],
   };
@@ -299,7 +311,11 @@ function DealtCard({ card, index, faceDown }) {
 }
 
 const makeStyles = (T) => StyleSheet.create({
+  hand: { alignItems: 'flex-start', width: HAND_W },
   handTitle: { color: T.dim, fontSize: 12, fontWeight: '800', letterSpacing: 0.6, marginBottom: 8 },
+  // Fixed width and left aligned: a centred row re-centres itself every time a
+  // card arrives, jerking every other card sideways mid-flight.
+  handRow: { flexDirection: 'row', gap: 6, minHeight: CARD_H, width: HAND_W },
   card: {
     width: CARD_W, height: CARD_H, borderRadius: 7, backgroundColor: T.cardFace,
     borderWidth: 1, borderColor: T.cardEdge, alignItems: 'center', paddingTop: 3,

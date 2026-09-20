@@ -166,7 +166,7 @@ export default function Krig({ onExit }) {
           />
           <Btn
             label={auto ? 'Stop' : 'Auto'}
-            icon={auto ? 'pause' : 'fast-forward'}
+            icon={auto ? 'pause' : 'play-forward'}
             color={T.violet}
             flex={1}
             onPress={() => setAuto((a) => !a)}

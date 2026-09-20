@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN } from '../ui';
@@ -184,12 +184,14 @@ export default function Blackjack({ onExit }) {
               color={T.green}
               onPress={chips > 0 ? deal : restart}
               disabled={chips > 0 && bet > chips}
+              sfx={chips > 0 ? null : 'tap'}
             />
           </>
         ) : phase === 'player' ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Btn label="Hit" icon="add" color={T.cyan} flex={1} onPress={hit} />
-            <Btn label="Stand" icon="hand-left" color={T.amber} flex={1} onPress={stand} />
+            <Btn label="Hit" icon="add" color={T.cyan} flex={1} onPress={hit} sfx={null} />
+            <Btn label="Stand" icon="hand-left" color={T.amber} flex={1} onPress={stand}
+                 sfx={null} />
           </View>
         ) : (
           <Btn label="Next hand" icon="arrow-forward" color={T.green} onPress={nextHand} />
@@ -254,22 +256,26 @@ function Hand({ title, cards, hideLast }) {
  * dealer's hole card additionally turns over in place when it is revealed:
  * scaleX runs to zero and back, and the face is swapped at the midpoint.
  */
-function DealtCard({ card, delay, faceDown }) {
+const DealtCard = React.memo(function DealtCard({ card, delay, faceDown }) {
   const { T, s } = useTheme(makeStyles);
   const deal = useRef(new Animated.Value(0)).current;
   const flip = useRef(new Animated.Value(faceDown ? 0 : 1)).current;
   const [showFace, setShowFace] = useState(!faceDown);
   const first = useRef(true);
+  // The stagger belongs to the moment this card was dealt. Reading the live
+  // prop would restart the throw whenever the hand grew and shifted the
+  // offsets, so it is captured once.
+  const stagger = useRef(delay).current;
 
   useEffect(() => {
     Animated.timing(deal, {
       toValue: 1,
       duration: 230,
-      delay,
+      delay: stagger,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [deal, delay]);
+  }, [deal, stagger]);
 
   useEffect(() => {
     if (first.current) {
@@ -288,7 +294,10 @@ function DealtCard({ card, delay, faceDown }) {
     return () => clearTimeout(id);
   }, [faceDown, flip]);
 
-  const style = {
+  // Built once: a fresh style object means fresh interpolation nodes, and the
+  // native driver tears down and rebuilds its node graph for the card -- while
+  // that same card is still in the air.
+  const style = useMemo(() => ({
     opacity: deal,
     transform: [
       { translateX: deal.interpolate({ inputRange: [0, 1], outputRange: [DEAL_FROM_X, 0] }) },
@@ -296,7 +305,7 @@ function DealtCard({ card, delay, faceDown }) {
       { rotate: deal.interpolate({ inputRange: [0, 1], outputRange: ['12deg', '0deg'] }) },
       { scaleX: flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.04, 1] }) },
     ],
-  };
+  }), [deal, flip]);
 
   if (!showFace) return <Animated.View style={[s.back, style]} />;
 
@@ -308,7 +317,7 @@ function DealtCard({ card, delay, faceDown }) {
       </Text>
     </Animated.View>
   );
-}
+});
 
 const makeStyles = (T) => StyleSheet.create({
   hand: { alignItems: 'flex-start', width: HAND_W },

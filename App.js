@@ -7,7 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { ThemeProvider, useTheme } from './theme';
 import { loadBests } from './storage';
-import { fx, useMuted } from './sound';
+import { fx, useMuted, warmUp } from './sound';
 
 import Snake from './games/snake';
 import Solitaire from './games/solitaire';
@@ -96,6 +96,8 @@ function Hub({ onPick }) {
 
   // Re-read on every return to the hub so a new best shows up immediately.
   useEffect(() => { loadBests().then((b) => setBests({ ...b })); }, []);
+  // Build the sound players while the menu is idle, so no tap ever pays for it.
+  useEffect(() => { warmUp(); }, []);
 
   return (
     <View style={[s.root, { paddingTop: insets.top + 10 }]}>

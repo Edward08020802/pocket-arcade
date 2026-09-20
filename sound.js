@@ -62,6 +62,35 @@ const FILES = {
   select: require('./assets/sfx/select.wav'),
 };
 
+/**
+ * The audio session is configured once, before any player is built.
+ *
+ * Without this iOS uses the default session and activates it lazily, on the
+ * first sound -- which happens inside a press handler, so the activation cost
+ * lands on a tap. Setting it up front also means effects are audible with the
+ * silent switch on, and `mixWithOthers` keeps whatever the player had going
+ * from being stopped by a card flip.
+ */
+let configured = false;
+function configure() {
+  if (configured) return;
+  configured = true;
+  try {
+    const mod = audio();
+    if (!mod || !mod.setAudioModeAsync) return;
+    const r = mod.setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: 'mixWithOthers',
+      allowsRecording: false,
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false,
+    });
+    if (r && r.catch) r.catch(() => {});
+  } catch {
+    // An unconfigured session still plays; it just costs more on first use.
+  }
+}
+
 const MUTE_KEY = 'pocket-arcade:muted';
 const players = {};
 let muted = false;
@@ -76,6 +105,7 @@ AsyncStorage.getItem(MUTE_KEY)
 
 function player(name) {
   if (!(name in players)) {
+    configure();
     try {
       const mod = audio();
       players[name] = mod ? mod.createAudioPlayer(FILES[name]) : null;
@@ -84,6 +114,29 @@ function player(name) {
     }
   }
   return players[name];
+}
+
+/**
+ * Builds every player ahead of time, one per tick.
+ *
+ * `createAudioPlayer` is a synchronous native call that loads and decodes the
+ * asset, and it used to run on the first tap that needed a given sound. That
+ * put a stall on the first Deal, then another on the first Hit, then another
+ * the first time a hand was won -- read as intermittent lag spikes, because a
+ * sound is only ever slow once and a game keeps reaching new ones.
+ *
+ * Spread across ticks rather than looped: twelve synchronous loads back to
+ * back would simply move the same stall to startup.
+ */
+export function warmUp() {
+  const names = Object.keys(FILES);
+  let i = 0;
+  const step = () => {
+    if (i >= names.length) return;
+    player(names[i++]);
+    setTimeout(step, 24);
+  };
+  setTimeout(step, 120);   // after the first screen has painted
 }
 
 export function play(name) {

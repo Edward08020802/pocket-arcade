@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme';
-import { Banner, Btn, FadeIn, GameFrame, WIN } from '../ui';
+import { Banner, Btn, GameFrame, WIN } from '../ui';
 import { getBest, submitScore } from '../storage';
 import { fx, play } from '../sound';
 
@@ -13,6 +13,9 @@ const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const CARD_W = Math.min((WIN.width - 90) / 5, 62);
 const CARD_H = Math.round(CARD_W * 1.42);
 const START_CHIPS = 100;
+// Where a card flies in from: roughly where a shoe would sit.
+const DEAL_FROM_X = 150;
+const DEAL_FROM_Y = -110;
 
 function freshShoe() {
   const cards = [];
@@ -208,27 +211,85 @@ export default function Blackjack({ onExit }) {
 }
 
 function Hand({ title, cards, hideLast }) {
-  const { T, s } = useTheme(makeStyles);
+  const { s } = useTheme(makeStyles);
   return (
     <View style={{ alignItems: 'center' }}>
       <Text style={s.handTitle}>{title}</Text>
       <View style={{ flexDirection: 'row', gap: 6, minHeight: CARD_H }}>
         {cards.map((c, i) => (
-          <FadeIn key={`${c.rank}${c.suit}${i}`} delay={i * 70}>
-            {hideLast && i === cards.length - 1 ? (
-              <View style={s.back} />
-            ) : (
-              <View style={s.card}>
-                <Text style={[s.rank, { color: c.red ? T.cardRed : T.cardBlack }]}>{c.rank}</Text>
-                <Text style={[s.suit, { color: c.red ? T.cardRed : T.cardBlack }]}>
-                  {SUITS.find((x) => x.key === c.suit).sym}
-                </Text>
-              </View>
-            )}
-          </FadeIn>
+          <DealtCard
+            key={`${c.rank}${c.suit}${i}`}
+            card={c}
+            index={i}
+            faceDown={!!hideLast && i === cards.length - 1}
+          />
         ))}
       </View>
     </View>
+  );
+}
+
+/**
+ * A card being dealt.
+ *
+ * It flies in from where the shoe sits (off to the upper right), turning as it
+ * lands, and each card in a hand starts a little after the one before it. The
+ * dealer's hole card additionally turns over in place when it is revealed:
+ * scaleX runs to zero and back, and the face is swapped at the midpoint.
+ */
+function DealtCard({ card, index, faceDown }) {
+  const { T, s } = useTheme(makeStyles);
+  const deal = useRef(new Animated.Value(0)).current;
+  const flip = useRef(new Animated.Value(faceDown ? 0 : 1)).current;
+  const [showFace, setShowFace] = useState(!faceDown);
+  const first = useRef(true);
+
+  useEffect(() => {
+    Animated.timing(deal, {
+      toValue: 1,
+      duration: 280,
+      delay: index * 110,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [deal, index]);
+
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      setShowFace(!faceDown);
+      return undefined;
+    }
+    const half = 150;
+    Animated.timing(flip, {
+      toValue: faceDown ? 0 : 1,
+      duration: half * 2,
+      easing: Easing.inOut(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+    const id = setTimeout(() => setShowFace(!faceDown), half);
+    return () => clearTimeout(id);
+  }, [faceDown, flip]);
+
+  const style = {
+    opacity: deal,
+    transform: [
+      { translateX: deal.interpolate({ inputRange: [0, 1], outputRange: [DEAL_FROM_X, 0] }) },
+      { translateY: deal.interpolate({ inputRange: [0, 1], outputRange: [DEAL_FROM_Y, 0] }) },
+      { rotate: deal.interpolate({ inputRange: [0, 1], outputRange: ['26deg', '0deg'] }) },
+      { scaleX: flip.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.04, 1] }) },
+    ],
+  };
+
+  if (!showFace) return <Animated.View style={[s.back, style]} />;
+
+  return (
+    <Animated.View style={[s.card, style]}>
+      <Text style={[s.rank, { color: card.red ? T.cardRed : T.cardBlack }]}>{card.rank}</Text>
+      <Text style={[s.suit, { color: card.red ? T.cardRed : T.cardBlack }]}>
+        {SUITS.find((x) => x.key === card.suit).sym}
+      </Text>
+    </Animated.View>
   );
 }
 

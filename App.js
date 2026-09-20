@@ -25,6 +25,7 @@ import LightsOut from './games/lightsout';
 import Mastermind from './games/mastermind';
 import Blackjack from './games/blackjack';
 import Chess from './games/chess';
+import Krig from './games/krig';
 
 /**
  * Every game is self-contained and offline: no network calls anywhere in this
@@ -79,9 +80,12 @@ const GAMES = [
   { key: 'blackjack', title: 'Blackjack', blurb: 'Beat the dealer without busting',
     icon: 'diamond', tint: '#FB7185', Component: Blackjack,
     score: (v) => `${v} chips` },
-  { key: 'chess', title: 'Chess', blurb: 'Five strength settings, ~400 to ~1800',
+  { key: 'chess', title: 'Chess', blurb: 'Five strength settings, ~400 to ~1600',
     icon: 'school', tint: '#E2E8F0', Component: Chess,
     score: (v) => `beat level ${v}` },
+  { key: 'krig', title: 'Krig', blurb: 'Danish war — highest card takes both',
+    icon: 'flash', tint: '#F43F5E', Component: Krig,
+    score: (v) => `${v} rounds` },
 ];
 
 function Hub({ onPick }) {

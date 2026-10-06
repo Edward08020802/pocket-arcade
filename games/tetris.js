@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme';
 import { Banner, Btn, GameFrame, WIN, useTicker } from '../ui';
 import { getBest, submitScore } from '../storage';
-import { fx, play } from '../sound';
+import { fx, play, rewindMusic, setMusic } from '../sound';
 
 const COLS = 10;
 const ROWS = 18;
@@ -76,6 +76,12 @@ export default function Tetris({ onExit }) {
 
   useEffect(() => { getBest('tetris').then(setBest); }, []);
 
+  // Theme music plays while a game is running; pausing or losing stops it.
+  useEffect(() => {
+    setMusic(over || paused ? null : 'tetris');
+  }, [over, paused]);
+  useEffect(() => () => setMusic(null), []);
+
   // The tick reads current values through refs so its identity stays stable.
   const st = useRef({});
   st.current = { board, piece, next, pos, over, paused };
@@ -90,6 +96,7 @@ export default function Tetris({ onExit }) {
     setScore(0);
     setOver(false);
     setPaused(false);
+    rewindMusic('tetris');
   }, []);
 
   const lock = useCallback((b, p, x, y) => {

@@ -175,12 +175,75 @@ export function fx(name, haptic = 'light') {
   if (haptic) buzz(haptic);
 }
 
+/**
+ * Background music: one looping track at a time, quieter than the effects.
+ *
+ * Built the first time a game asks for it rather than in warmUp(), since only
+ * Tetris has a track and the decode is the same synchronous load as above.
+ * `musicWanted` remembers what should be playing, so unmuting resumes it.
+ */
+const MUSIC = {
+  tetris: require('./assets/music/korobeiniki.m4a'),
+};
+const tracks = {};
+let musicWanted = null;
+
+function track(name) {
+  if (!(name in tracks)) {
+    configure();
+    try {
+      const mod = audio();
+      const p = mod ? mod.createAudioPlayer(MUSIC[name]) : null;
+      if (p) {
+        p.loop = true;
+        p.volume = 0.45;
+      }
+      tracks[name] = p;
+    } catch {
+      tracks[name] = null;
+    }
+  }
+  return tracks[name];
+}
+
+function startMusic(name) {
+  try {
+    const p = track(name);
+    if (p) p.play();
+  } catch {}
+}
+
+function pauseMusic() {
+  Object.values(tracks).forEach((p) => {
+    try { if (p) p.pause(); } catch {}
+  });
+}
+
+/** Plays `name` on loop (null stops). Picks up where it left off on resume. */
+export function setMusic(name) {
+  if (name && !MUSIC[name]) name = null;
+  if (musicWanted && musicWanted !== name) pauseMusic();
+  musicWanted = name;
+  if (name && !muted) startMusic(name);
+  else pauseMusic();
+}
+
+/** Rewinds a track, for a fresh game. */
+export function rewindMusic(name) {
+  try {
+    const p = tracks[name];
+    if (p) p.seekTo(0).catch(() => {});
+  } catch {}
+}
+
 export function isMuted() {
   return muted;
 }
 
 export async function setMuted(next) {
   muted = next;
+  if (muted) pauseMusic();
+  else if (musicWanted) startMusic(musicWanted);
   listeners.forEach((fn) => fn(muted));
   try {
     await AsyncStorage.setItem(MUTE_KEY, next ? '1' : '0');
